@@ -10,8 +10,10 @@ loosely-typed argument coercion, a JSON-to-`Tool` bridge, result/prompt builders
 append-only activity log, and the ready-to-paste client config snippets for Claude Desktop,
 Claude Code, Codex, and Cursor.
 
-Everything is **service-agnostic** — MCPKit knows nothing about your domain. You implement
+Everything is **service-agnostic** - MCPKit knows nothing about your domain. You implement
 one protocol with your own tool catalog and dispatch; MCPKit wires it to the SDK.
+
+[**API documentation**](https://swiftpackageindex.com/adamtheturtle/MCPKit/documentation/mcpkit)
 
 ## Installation
 
@@ -116,4 +118,4 @@ for client in MCPClient.allCases {
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).
