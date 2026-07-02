@@ -1,5 +1,5 @@
 version: 1
 builder:
   configs:
-    - platform: macosSpm
-      documentation_targets: [MCPKit]
+    - documentation_targets:
+        - MCPKit
