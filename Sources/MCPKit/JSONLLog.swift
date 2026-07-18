@@ -6,15 +6,19 @@
 //  `--mcp` process is a separate launch from a running GUI, so it records what it does to
 //  a small file in a shared container both can reach; a settings pane can tail that file.
 //
-//  It provides a `FileHandle`/`seekToEnd` append (creating the file on the first write), a
-//  tolerant line-by-line parse that skips a torn or malformed line rather than failing the
-//  whole read, a `maxEntries` cap, and a `clear()` that removes the file. The entry schema
-//  and the cap are the generic parameters; each app keeps its own `Entry` type.
+//  It provides an `O_APPEND` append (creating the file on the first write), a tolerant
+//  line-by-line parse that skips a torn or malformed line rather than failing the whole
+//  read, a `maxEntries` cap, and a `clear()` that removes the file. The entry schema and
+//  the cap are the generic parameters; each app keeps its own `Entry` type.
 //
 //  Concurrency: several MCP clients can each launch their own `--mcp` process, so writes
-//  are append-only (small atomic appends). Trimming to the last N entries is done by the
-//  single GUI reader when it loads, avoiding multi-process rewrite races. Every member is
-//  nonisolated, so the headless server can append from any context.
+//  are append-only and go through an `O_APPEND` descriptor, where the kernel makes the
+//  position-and-write a single step - the property the multi-process design rests on.
+//  Reads split the file's bytes and decode each line separately, so a line damaged by
+//  anything else on the system doesn't take the rest of the log with it. Trimming to the
+//  last N entries is done by the single GUI reader when it loads, avoiding multi-process
+//  rewrite races. Every member is nonisolated, so the headless server can append from any
+//  context.
 //
 
 import Foundation
@@ -82,52 +86,70 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
         return directory.appending(path: fileName)
     }
 
-    /// Appends `entry` as one JSON line. Uses an open handle seeked to the end when the
-    /// file already exists, else creates it with this first line. A non-encodable entry is
-    /// silently dropped.
+    /// Appends `entry` as one JSON line, creating the file if it doesn't exist yet.
+    ///
+    /// The file is opened `O_WRONLY|O_APPEND|O_CREAT`, so the kernel positions each write
+    /// at the current end of file as part of the write itself. That is what makes the
+    /// multi-process appending this type is designed for safe: two `--mcp` processes
+    /// writing at once can't resolve the same offset and overwrite one another. A
+    /// seek-then-write handle would lose entries and tear lines under exactly that load.
+    ///
+    /// A non-encodable entry, an unopenable file, and a failed write are all silently
+    /// dropped: a log line is never worth failing a tool call over, and - crucially - a
+    /// log the process can't write to is left exactly as it is rather than replaced.
     public func append(_ entry: Entry) {
         guard let url = fileURL,
               let data = encode(entry),
               let line = String(data: data, encoding: .utf8) else { return }
 
         let payload = Data((line + "\n").utf8)
-        if let handle = try? FileHandle(forWritingTo: url) {
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: payload)
-        } else {
-            // First write: create the file with this line.
-            try? payload.write(to: url, options: .atomic)
+        let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+
+            return open(path, O_WRONLY | O_APPEND | O_CREAT, 0o644)
         }
+        guard descriptor >= 0 else { return }
+
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
+        defer { try? handle.close() }
+        try? handle.write(contentsOf: payload)
     }
 
     /// The stored entries, oldest first, capped to the last `maxEntries`. Decodes
-    /// tolerantly: a malformed line (e.g. a torn concurrent append) is skipped rather than
-    /// failing the whole read. An absent file reads as empty.
+    /// tolerantly: a malformed line - torn JSON, or bytes that aren't even valid UTF-8 -
+    /// is skipped rather than failing the whole read. An absent file reads as empty.
     public func load() -> [Entry] {
-        guard let url = fileURL, let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-
-        let entries = text
-            .split(separator: "\n", omittingEmptySubsequences: true)
-            .compactMap { line -> Entry? in
-                guard let data = line.data(using: .utf8) else { return nil }
-
-                return decode(data)
-            }
+        let entries = rawLines().compactMap { decode(Data($0)) }
         return Array(entries.suffix(maxEntries))
+    }
+
+    /// The file's newline-separated lines as raw bytes, empty when it can't be read.
+    ///
+    /// Splitting the bytes rather than a decoded `String` is deliberate: decoding the file
+    /// as one UTF-8 `String` fails outright on a single bad byte, so one torn append would
+    /// make every entry in the log invisible. Each line is decoded on its own instead, and
+    /// only the damaged one is lost.
+    private func rawLines() -> [Data.SubSequence] {
+        guard let url = fileURL, let data = try? Data(contentsOf: url) else { return [] }
+
+        return data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
     }
 
     /// Rewrites the file to only its last `maxEntries` lines when it has grown past the
     /// cap, so the log can't grow without bound. Call from the single GUI reader after a
     /// load, so it doesn't race the headless appenders. A no-op when already within the cap.
     public func trim() {
-        guard let url = fileURL, let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        guard let url = fileURL else { return }
 
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
+        let lines = rawLines()
         guard lines.count > maxEntries else { return }
 
-        let trimmed = lines.suffix(maxEntries).joined(separator: "\n") + "\n"
-        try? Data(trimmed.utf8).write(to: url, options: .atomic)
+        var trimmed = Data()
+        for line in lines.suffix(maxEntries) {
+            trimmed.append(contentsOf: line)
+            trimmed.append(UInt8(ascii: "\n"))
+        }
+        try? trimmed.write(to: url, options: .atomic)
     }
 
     /// Deletes the log file, e.g. so it doesn't outlive the data it describes.
