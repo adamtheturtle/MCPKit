@@ -29,9 +29,14 @@ public func missingArgument(_ name: String) -> CallTool.Result {
 /// Encodes a result dictionary as pretty, key-sorted JSON text, or an error result when
 /// it can't be serialized.
 public func jsonResult(_ object: [String: Any]) -> CallTool.Result {
-    guard let data = try? JSONSerialization.data(
-        withJSONObject: object, options: [.prettyPrinted, .sortedKeys]
-    ) else {
+    // `JSONSerialization.data(withJSONObject:)` raises an Objective-C `NSException` -
+    // which no Swift `catch` can see - for contents JSON can't express, such as
+    // `Double.nan`, a `Date`, or a `URL`. Validating first is what makes the error
+    // result below reachable instead of aborting the process.
+    guard JSONSerialization.isValidJSONObject(object),
+          let data = try? JSONSerialization.data(
+              withJSONObject: object, options: [.prettyPrinted, .sortedKeys]
+          ) else {
         return errorResult("Could not encode the result.")
     }
 

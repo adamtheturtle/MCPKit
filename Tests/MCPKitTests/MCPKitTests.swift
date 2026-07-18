@@ -5,7 +5,8 @@
 //  Exercises the service-agnostic MCP scaffolding: argument coercion, the JSON
 //  descriptor -> Tool bridge, the result builders, the prompt helpers, and the
 //  MCPToolProvider default implementations. The server bootstrap is thin glue over the
-//  SDK; these prove the reusable logic a host app builds on.
+//  SDK; these prove the reusable logic a host app builds on. The JSONL activity log has
+//  enough of its own behaviour to warrant a file: see `JSONLLogTests.swift`.
 //
 
 import Foundation
@@ -35,6 +36,30 @@ struct ArgumentTests {
         #expect(intArgument(args, "s") == 42)
         #expect(intArgument(args, "bad") == nil)
         #expect(intArgument(args, "missing") == nil)
+    }
+
+    @Test
+    func `intArgument rejects numbers no Int can hold, rather than trapping`() {
+        // The SDK's decoder tries Int first and falls back to Double, so any JSON number
+        // outside Int's range arrives as a `.double`. `Int(_: Double)` traps on each of
+        // these, killing the server process on a single tool call.
+        let args: [String: Value] = [
+            "huge": .double(1e20),
+            "tiny": .double(-1e20),
+            "notANumber": .double(.nan),
+            "infinite": .double(.infinity),
+            "hugeString": .string("99999999999999999999")
+        ]
+        for key in args.keys {
+            #expect(intArgument(args, key) == nil, "\(key) should not coerce to an Int")
+        }
+    }
+
+    @Test
+    func `intArgument truncates a fractional numeric string as it does a double`() {
+        #expect(intArgument(["s": .string("3.9")], "s") == 3)
+        #expect(intArgument(["s": .string("-3.9")], "s") == -3)
+        #expect(intArgument(["s": .string("nope")], "s") == nil)
     }
 
     @Test
@@ -119,6 +144,17 @@ struct ResultTests {
     }
 
     @Test
+    func `jsonResult reports values JSON can't express instead of aborting`() {
+        // JSONSerialization raises an Objective-C NSException - uncatchable from Swift -
+        // for each of these, so the documented error path has to be reached by checking
+        // the object first.
+        #expect(jsonResult(["average": Double.nan]).isError == true)
+        #expect(jsonResult(["ratio": Double.infinity]).isError == true)
+        #expect(jsonResult(["at": Date()]).isError == true)
+        #expect(jsonResult(["where": URL(string: "https://example.com")!]).isError == true)
+    }
+
+    @Test
     func `jsonResult encodes sorted, decodable JSON`() throws {
         let result = jsonResult(["b": 2, "a": 1])
         let json = try #require(text(of: result))
@@ -162,90 +198,6 @@ struct StdioBootstrapTests {
     @Test
     func `stdioModeFlag is the conventional --mcp`() {
         #expect(MCPServer.stdioModeFlag == "--mcp")
-    }
-}
-
-/// A small `Codable & Sendable` entry for exercising `JSONLLog` round-trips.
-private struct LogRow: Codable, Sendable, Equatable {
-    let n: Int
-    let text: String
-}
-
-@Suite("JSONL log")
-struct JSONLLogTests {
-    /// A log in a fresh temp directory, plus that directory (so a test can inspect/tear it
-    /// down). Each call gets a unique directory so tests don't collide.
-    private func makeLog(maxEntries: Int) -> (log: JSONLLog<LogRow>, directory: URL) {
-        let directory = FileManager.default.temporaryDirectory
-            .appending(path: "JSONLLogTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-        let log = JSONLLog<LogRow>(directory: directory, fileName: "log.jsonl", maxEntries: maxEntries)
-        return (log, directory)
-    }
-
-    @Test
-    func `append then load round-trips entries oldest first`() {
-        let (log, directory) = makeLog(maxEntries: 30)
-        defer { try? FileManager.default.removeItem(at: directory) }
-
-        let rows = [LogRow(n: 1, text: "a"), LogRow(n: 2, text: "b"), LogRow(n: 3, text: "c")]
-        for row in rows { log.append(row) }
-
-        #expect(log.load() == rows)
-    }
-
-    @Test
-    func `load skips a malformed line`() throws {
-        let (log, directory) = makeLog(maxEntries: 30)
-        defer { try? FileManager.default.removeItem(at: directory) }
-
-        log.append(LogRow(n: 1, text: "a"))
-        // Inject a torn/garbage line between two valid ones, as a concurrent append might.
-        let url = directory.appending(path: "log.jsonl")
-        let handle = try FileHandle(forWritingTo: url)
-        try handle.seekToEnd()
-        try handle.write(contentsOf: Data("{not json}\n".utf8))
-        try handle.close()
-        log.append(LogRow(n: 2, text: "b"))
-
-        #expect(log.load() == [LogRow(n: 1, text: "a"), LogRow(n: 2, text: "b")])
-    }
-
-    @Test
-    func `load caps at maxEntries keeping the newest`() {
-        let (log, directory) = makeLog(maxEntries: 3)
-        defer { try? FileManager.default.removeItem(at: directory) }
-
-        for n in 1 ... 10 { log.append(LogRow(n: n, text: "\(n)")) }
-
-        // The last three appended survive the read cap, oldest of those first.
-        #expect(log.load().map(\.n) == [8, 9, 10])
-    }
-
-    @Test
-    func `trim rewrites the file down to the cap`() throws {
-        let (log, directory) = makeLog(maxEntries: 3)
-        defer { try? FileManager.default.removeItem(at: directory) }
-
-        for n in 1 ... 10 { log.append(LogRow(n: n, text: "\(n)")) }
-        log.trim()
-
-        // After trimming, the on-disk file itself holds only the last three lines.
-        let url = directory.appending(path: "log.jsonl")
-        let text = try String(contentsOf: url, encoding: .utf8)
-        let lineCount = text.split(separator: "\n", omittingEmptySubsequences: true).count
-        #expect(lineCount == 3)
-        #expect(log.load().map(\.n) == [8, 9, 10])
-    }
-
-    @Test
-    func `clear removes the file so load returns empty`() {
-        let (log, directory) = makeLog(maxEntries: 30)
-        defer { try? FileManager.default.removeItem(at: directory) }
-
-        log.append(LogRow(n: 1, text: "a"))
-        #expect(!log.load().isEmpty)
-        log.clear()
-        #expect(log.load().isEmpty)
     }
 }
 

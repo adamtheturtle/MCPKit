@@ -6,8 +6,9 @@
 //  binary is launched with `--mcp` it must NOT start its UI: it speaks MCP over stdio, so
 //  its synchronous `main` needs to bridge to the async server and never return. This lifts
 //  that shared shape here: detect the flag, read the bundle version, build the server, run
-//  it over `StdioTransport`, and block the calling thread on a `DispatchSemaphore` until
-//  the transport closes, logging any failure to standard error.
+//  it over `StdioTransport`, and keep the process alive until the transport closes, logging
+//  any failure to standard error. Called from `main`, it gives the main thread to
+//  `dispatchMain()` rather than blocking it, so a `@MainActor` provider can still run.
 //
 //  What stays app-side is passed in as closures: the enabled-gate check and any launch
 //  side effect are service-specific, so `isEnabled` and `onLaunch` are supplied by the
@@ -50,6 +51,10 @@ public extension MCPServer {
     /// Failures starting or running the server are logged to standard error (prefixed with
     /// `name`) and the process still exits cleanly.
     ///
+    /// Called from the main thread (the usual case, a host's `main`), this drives the main
+    /// queue instead of blocking, so the main actor stays live: a provider is free to read
+    /// `@MainActor` app state while serving.
+    ///
     /// - Parameters:
     ///   - name: The server identity for `serverInfo` and error-log prefixing.
     ///   - version: The version for `serverInfo`. Defaults to `bundleShortVersion`.
@@ -77,7 +82,8 @@ public extension MCPServer {
         onLaunch()
 
         // Bridge the SDK's async server to this synchronous, never-returning entry point.
-        let semaphore = DispatchSemaphore(value: 0)
+        // The server runs as a detached task and ends the process itself when the
+        // transport closes, so nothing here has to wait for it.
         Task {
             let server = MCPServer(
                 name: name,
@@ -90,9 +96,21 @@ public extension MCPServer {
             } catch {
                 FileHandle.standardError.write(Data("\(name) MCP server failed to start: \(error)\n".utf8))
             }
-            semaphore.signal()
+            exit(0)
         }
-        semaphore.wait()
-        exit(0)
+
+        if Thread.isMainThread {
+            // The main thread *is* the main actor's executor, so blocking it here (as a
+            // `DispatchSemaphore.wait()` would) deadlocks any provider that touches
+            // `@MainActor` state - the natural shape for serving a running app's data.
+            // `dispatchMain()` hands the thread to the main queue's drain loop instead:
+            // it never returns, and main-actor work still gets to run on it.
+            dispatchMain()
+        } else {
+            // Off the main thread there is no executor to starve, so parking this thread
+            // costs nothing; the task above still owns process exit.
+            let neverSignalled = DispatchSemaphore(value: 0)
+            while true { neverSignalled.wait() }
+        }
     }
 }
