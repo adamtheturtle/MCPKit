@@ -47,7 +47,7 @@ struct ArgumentTests {
             "tiny": .double(-1e20),
             "notANumber": .double(.nan),
             "infinite": .double(.infinity),
-            "hugeString": .string("99999999999999999999"),
+            "hugeString": .string("99999999999999999999")
         ]
         for key in args.keys {
             #expect(intArgument(args, key) == nil, "\(key) should not coerce to an Int")
@@ -90,7 +90,7 @@ struct ToolSchemaTests {
             "name": "list_things",
             "description": "Lists things.",
             "inputSchema": ["type": "object", "properties": ["page": ["type": "integer"]]],
-            "annotations": ["title": "List things", "readOnlyHint": true, "destructiveHint": false],
+            "annotations": ["title": "List things", "readOnlyHint": true, "destructiveHint": false]
         ]
         let tool = mcpTool(from: descriptor)
         #expect(tool.name == "list_things")
@@ -100,7 +100,7 @@ struct ToolSchemaTests {
         #expect(tool.annotations.destructiveHint == false)
         #expect(tool.inputSchema == .object([
             "type": .string("object"),
-            "properties": .object(["page": .object(["type": .string("integer")])]),
+            "properties": .object(["page": .object(["type": .string("integer")])])
         ]))
     }
 
