@@ -17,7 +17,15 @@ Add the `MCPKit` product to your target dependencies.
 ## Product
 
 - `MCPKit`: Provider protocols, server bootstrap, argument helpers, result builders, and
-  client configuration snippets for MCP integrations.
+  activity logging for MCP integrations.
+
+## Client configuration migration
+
+`MCPClient` is deprecated and will be removed in MCPKit 1.0. Applications that show
+client setup instructions or edit client configuration should use
+[`MCPClientInstall`](https://github.com/adamtheturtle/MCPClientInstall) and its
+`MCPDesktopClient` catalogue. Keeping client paths, formats, snippets, and safe file
+editing in that package prevents the two catalogues from drifting.
 
 ## Requirements
 

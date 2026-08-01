@@ -9,8 +9,11 @@ Scaffolding for exposing Swift app features as a Model Context Protocol server.
 over stdio or another transport.
 
 The package also includes helpers for JSON-backed tool descriptors, loose argument
-coercion, result builders, prompt messages, JSONL activity logging, and client
-configuration snippets.
+coercion, result builders, prompt messages, and JSONL activity logging.
+
+Client configuration metadata and installation belong to the separate
+`MCPClientInstall` package. The deprecated ``MCPClient`` catalogue remains only for
+source compatibility and will be removed in MCPKit 1.0.
 
 ## Topics
 
@@ -35,8 +38,7 @@ configuration snippets.
 - ``jsonResult(_:)``
 - ``missingArgument(_:)``
 
-### Prompts and clients
+### Prompts and logging
 
 - ``PromptError``
-- ``MCPClient``
 - ``JSONLLog``

@@ -19,6 +19,10 @@ import Foundation
 /// An MCP client a host app can give setup instructions (or install itself) for. The
 /// service supplies its own server name; everything else - the display name, config path,
 /// snippet format, and the snippet text - is shared.
+@available(
+    *, deprecated,
+    message: "Use MCPDesktopClient from MCPClientInstall; MCPClient will be removed in MCPKit 1.0."
+)
 public enum MCPClient: String, CaseIterable, Identifiable, Sendable {
     case claudeDesktop
     case claudeCode

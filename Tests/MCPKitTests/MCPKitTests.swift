@@ -201,41 +201,6 @@ struct StdioBootstrapTests {
     }
 }
 
-@Suite("MCP client catalogue")
-struct MCPClientTests {
-    @Test
-    func `every client snippet carries the server name and command`() {
-        // A slash-free command so the assertion isn't tripped by JSON's forward-slash
-        // escaping (the JSON builder emits "\/").
-        let command = "MyAppExecutable"
-        for client in MCPClient.allCases {
-            let snippet = client.configSnippet(command: command, serverName: "myapp")
-            #expect(snippet.contains("myapp"), "\(client) snippet missing server name")
-            #expect(snippet.contains(command), "\(client) snippet missing command")
-        }
-    }
-
-    @Test
-    func `snippet format matches the client`() {
-        #expect(MCPClient.claudeDesktop.configSnippet(command: "cmd", serverName: "myapp")
-            .contains("\"mcpServers\""))
-        #expect(MCPClient.cursor.configSnippet(command: "cmd", serverName: "myapp")
-            .contains("\"mcpServers\""))
-        #expect(MCPClient.claudeCode.configSnippet(command: "cmd", serverName: "myapp")
-            .hasPrefix("claude mcp add myapp"))
-        #expect(MCPClient.codex.configSnippet(command: "cmd", serverName: "myapp")
-            .contains("[mcp_servers.myapp]"))
-    }
-
-    @Test
-    func `display names and command flag are stable`() {
-        #expect(MCPClient.allCases.map(\.displayName)
-            == ["Claude Desktop", "Claude Code", "Codex", "Cursor"])
-        #expect(MCPClient.claudeCode.isCommand)
-        #expect(!MCPClient.codex.isCommand)
-    }
-}
-
 /// A minimal provider that only implements the two required methods, so the optional
 /// prompt/resource defaults are exercised.
 private struct ToolsOnlyProvider: MCPToolProvider {
