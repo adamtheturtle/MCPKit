@@ -11,9 +11,8 @@
 
 import Foundation
 import MCP
-import Testing
-
 @testable import MCPKit
+import Testing
 
 @Suite("Argument coercion")
 struct ArgumentTests {
@@ -48,7 +47,7 @@ struct ArgumentTests {
             "tiny": .double(-1e20),
             "notANumber": .double(.nan),
             "infinite": .double(.infinity),
-            "hugeString": .string("99999999999999999999")
+            "hugeString": .string("99999999999999999999"),
         ]
         for key in args.keys {
             #expect(intArgument(args, key) == nil, "\(key) should not coerce to an Int")
@@ -91,7 +90,7 @@ struct ToolSchemaTests {
             "name": "list_things",
             "description": "Lists things.",
             "inputSchema": ["type": "object", "properties": ["page": ["type": "integer"]]],
-            "annotations": ["title": "List things", "readOnlyHint": true, "destructiveHint": false]
+            "annotations": ["title": "List things", "readOnlyHint": true, "destructiveHint": false],
         ]
         let tool = mcpTool(from: descriptor)
         #expect(tool.name == "list_things")
@@ -101,7 +100,7 @@ struct ToolSchemaTests {
         #expect(tool.annotations.destructiveHint == false)
         #expect(tool.inputSchema == .object([
             "type": .string("object"),
-            "properties": .object(["page": .object(["type": .string("integer")])])
+            "properties": .object(["page": .object(["type": .string("integer")])]),
         ]))
     }
 
@@ -144,14 +143,14 @@ struct ResultTests {
     }
 
     @Test
-    func `jsonResult reports values JSON can't express instead of aborting`() {
+    func `jsonResult reports values JSON can't express instead of aborting`() throws {
         // JSONSerialization raises an Objective-C NSException - uncatchable from Swift -
         // for each of these, so the documented error path has to be reached by checking
         // the object first.
         #expect(jsonResult(["average": Double.nan]).isError == true)
         #expect(jsonResult(["ratio": Double.infinity]).isError == true)
         #expect(jsonResult(["at": Date()]).isError == true)
-        #expect(jsonResult(["where": URL(string: "https://example.com")!]).isError == true)
+        #expect(try jsonResult(["where": #require(URL(string: "https://example.com"))]).isError == true)
     }
 
     @Test
@@ -159,7 +158,7 @@ struct ResultTests {
         let result = jsonResult(["b": 2, "a": 1])
         let json = try #require(text(of: result))
         // Keys are sorted, so "a" precedes "b" in the serialized form.
-        #expect(json.range(of: "\"a\"")!.lowerBound < json.range(of: "\"b\"")!.lowerBound)
+        #expect(try #require(json.range(of: "\"a\"")?.lowerBound) < json.range(of: "\"b\"")!.lowerBound)
         let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Int]
         #expect(decoded == ["a": 1, "b": 2])
     }
@@ -180,6 +179,12 @@ struct PromptHelperTests {
         #expect(throws: PromptError.missingArgument("t")) {
             try requiredPromptArgument([:], "t")
         }
+    }
+
+    @Test
+    func `prompt errors describe invalid values`() {
+        let error = PromptError.invalidArgument(name: "pad_id", reason: "must be a safe identifier")
+        #expect(error == .invalidArgument(name: "pad_id", reason: "must be a safe identifier"))
     }
 }
 
@@ -208,7 +213,7 @@ private struct ToolsOnlyProvider: MCPToolProvider {
         [Tool(name: "ping", description: "Ping.", inputSchema: .object([:]))]
     }
 
-    func callTool(_ name: String, arguments: [String: Value]?) async -> CallTool.Result {
+    func callTool(_ name: String, arguments _: [String: Value]?) async -> CallTool.Result {
         name == "ping" ? textResult("pong") : errorResult("Unknown tool: \(name)")
     }
 }

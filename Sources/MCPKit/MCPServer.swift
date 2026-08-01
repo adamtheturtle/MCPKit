@@ -80,6 +80,8 @@ public struct MCPServer {
                 throw MCPError.invalidParams("Unknown prompt: \(name)")
             } catch let PromptError.missingArgument(name) {
                 throw MCPError.invalidParams("Missing required argument: \(name)")
+            } catch let PromptError.invalidArgument(name, reason) {
+                throw MCPError.invalidParams("Invalid argument \(name): \(reason)")
             }
         }
 

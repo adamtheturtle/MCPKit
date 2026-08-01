@@ -17,6 +17,7 @@ import MCP
 public enum PromptError: Swift.Error, Equatable {
     case unknownPrompt(String)
     case missingArgument(String)
+    case invalidArgument(name: String, reason: String)
 }
 
 /// A trimmed, non-empty value for `key` in a prompt's arguments, or nil.
