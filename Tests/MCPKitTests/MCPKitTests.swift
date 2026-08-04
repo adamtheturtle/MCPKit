@@ -233,7 +233,33 @@ struct StdioBootstrapTests {
     func `stdioModeFlag is the conventional --mcp`() {
         #expect(MCPServer.stdioModeFlag == "--mcp")
     }
+
+    @Test
+    func `a thrown server operation exits its process with failure`() throws {
+        let fixture = Bundle(for: TestBundleMarker.self).bundleURL
+            .deletingLastPathComponent()
+            .appending(path: "MCPKitStdioFailureFixture")
+        #expect(FileManager.default.isExecutableFile(atPath: fixture.path))
+
+        let standardError = Pipe()
+        let process = Process()
+        process.executableURL = fixture
+        process.standardError = standardError
+        process.standardOutput = Pipe()
+        try process.run()
+        process.waitUntilExit()
+
+        let diagnostic = String(
+            decoding: standardError.fileHandleForReading.readDataToEndOfFile(),
+            as: UTF8.self
+        )
+        #expect(process.terminationReason == .exit)
+        #expect(process.terminationStatus == EXIT_FAILURE)
+        #expect(diagnostic.contains("Fixture MCP server failed to start"))
+    }
 }
+
+private final class TestBundleMarker: NSObject {}
 
 /// A minimal provider that only implements the two required methods, so the optional
 /// prompt/resource defaults are exercised.
