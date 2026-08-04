@@ -122,6 +122,20 @@ struct JSONLLogTests {
     }
 
     @Test
+    func `negative maxEntries is normalized to an empty log`() throws {
+        let (log, directory) = makeLog(maxEntries: -1)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        #expect(log.maxEntries == 0)
+        log.append(LogRow(n: 1, text: "one"))
+        #expect(log.load().isEmpty)
+
+        log.trim()
+        let data = try Data(contentsOf: directory.appending(path: "log.jsonl"))
+        #expect(data.isEmpty)
+    }
+
+    @Test
     func `trim rewrites the file down to the cap`() throws {
         let (log, directory) = makeLog(maxEntries: 3)
         defer { try? FileManager.default.removeItem(at: directory) }
