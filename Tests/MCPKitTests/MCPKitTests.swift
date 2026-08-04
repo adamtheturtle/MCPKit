@@ -101,14 +101,14 @@ struct ToolSchemaTests {
     }
 
     @Test
-    func `mcpTool reads name, description, schema and annotations`() {
+    func `mcpTool reads name, description, schema and annotations`() throws {
         let descriptor: [String: Any] = [
             "name": "list_things",
             "description": "Lists things.",
             "inputSchema": ["type": "object", "properties": ["page": ["type": "integer"]]],
             "annotations": ["title": "List things", "readOnlyHint": true, "destructiveHint": false]
         ]
-        let tool = mcpTool(from: descriptor)
+        let tool = try #require(mcpTool(from: descriptor))
         #expect(tool.name == "list_things")
         #expect(tool.description == "Lists things.")
         #expect(tool.annotations.title == "List things")
@@ -121,8 +121,8 @@ struct ToolSchemaTests {
     }
 
     @Test
-    func `mcpTool tolerates a partial descriptor`() {
-        let tool = mcpTool(from: ["name": "bare"])
+    func `mcpTool tolerates a partial descriptor`() throws {
+        let tool = try #require(mcpTool(from: ["name": "bare"]))
         #expect(tool.name == "bare")
         #expect(tool.description == "")
         #expect(tool.inputSchema == .object([:]))
@@ -132,6 +132,19 @@ struct ToolSchemaTests {
     func `mcpTools converts a whole catalog`() {
         let tools = mcpTools(from: [["name": "a"], ["name": "b"]])
         #expect(tools.map(\.name) == ["a", "b"])
+    }
+
+    @Test
+    func `mcpTools omits descriptors without a usable name`() {
+        let descriptors: [[String: Any]] = [
+            [:],
+            ["name": " \n\t "],
+            ["name": 42],
+            ["name": "  valid_tool  "]
+        ]
+
+        #expect(descriptors.dropLast().allSatisfy { mcpTool(from: $0) == nil })
+        #expect(mcpTools(from: descriptors).map(\.name) == ["valid_tool"])
     }
 }
 
