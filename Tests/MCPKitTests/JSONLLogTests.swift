@@ -18,6 +18,30 @@ private struct LogRow: Codable, Sendable, Equatable {
     let text: String
 }
 
+private struct DatedLogRow: Codable, Sendable {
+    let n: Int
+    let date: Date
+}
+
+private final class CoderOverlapTracker: @unchecked Sendable {
+    private let lock = NSLock()
+    private var activeCalls = 0
+    private var overlapObserved = false
+
+    var didObserveOverlap: Bool {
+        lock.withLock { overlapObserved }
+    }
+
+    func observeCall() {
+        lock.withLock {
+            activeCalls += 1
+            overlapObserved = overlapObserved || activeCalls > 1
+        }
+        Thread.sleep(forTimeInterval: 0.005)
+        lock.withLock { activeCalls -= 1 }
+    }
+}
+
 @Suite("JSONL log")
 struct JSONLLogTests {
     /// A log in a fresh temp directory, plus that directory (so a test can inspect/tear it
@@ -27,6 +51,35 @@ struct JSONLLogTests {
             .appending(path: "JSONLLogTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         let log = JSONLLog<LogRow>(directory: directory, fileName: "log.jsonl", maxEntries: maxEntries)
         return (log, directory)
+    }
+
+    private func makeTrackedLog(
+        encoderTracker: CoderOverlapTracker,
+        decoderTracker: CoderOverlapTracker
+    ) -> (log: JSONLLog<DatedLogRow>, directory: URL) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .custom { date, output in
+            encoderTracker.observeCall()
+            var container = output.singleValueContainer()
+            try container.encode(date.timeIntervalSince1970)
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { input in
+            decoderTracker.observeCall()
+            return Date(timeIntervalSince1970: try input.singleValueContainer().decode(Double.self))
+        }
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "JSONLLogTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        return (
+            JSONLLog(
+                directory: directory,
+                fileName: "log.jsonl",
+                maxEntries: 100,
+                encoder: encoder,
+                decoder: decoder
+            ),
+            directory
+        )
     }
 
     @Test
@@ -103,6 +156,27 @@ struct JSONLLogTests {
         #expect(loaded.count == writers * perWriter)
         // Every line is intact and distinct, i.e. none was overwritten or torn.
         #expect(Set(loaded.map(\.n)).count == writers * perWriter)
+    }
+
+    @Test
+    func `concurrent operations serialize caller supplied JSON coders`() {
+        let encoderTracker = CoderOverlapTracker()
+        let decoderTracker = CoderOverlapTracker()
+        let (log, directory) = makeTrackedLog(
+            encoderTracker: encoderTracker,
+            decoderTracker: decoderTracker
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        DispatchQueue.concurrentPerform(iterations: 16) { n in
+            log.append(DatedLogRow(n: n, date: Date(timeIntervalSince1970: Double(n))))
+        }
+        #expect(!encoderTracker.didObserveOverlap)
+
+        DispatchQueue.concurrentPerform(iterations: 8) { _ in
+            _ = log.load()
+        }
+        #expect(!decoderTracker.didObserveOverlap)
     }
 
     @Test
