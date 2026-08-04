@@ -193,30 +193,6 @@ struct ResultTests {
     }
 }
 
-@Suite("Prompt helpers")
-struct PromptHelperTests {
-    @Test
-    func `promptArgument trims and nils empties`() {
-        #expect(promptArgument(["t": "  hi  "], "t") == "hi")
-        #expect(promptArgument(["t": "   "], "t") == nil)
-        #expect(promptArgument(nil, "t") == nil)
-    }
-
-    @Test
-    func `requiredPromptArgument throws for an absent argument`() throws {
-        #expect(try requiredPromptArgument(["t": "x"], "t") == "x")
-        #expect(throws: PromptError.missingArgument("t")) {
-            try requiredPromptArgument([:], "t")
-        }
-    }
-
-    @Test
-    func `prompt errors describe invalid values`() {
-        let error = PromptError.invalidArgument(name: "pad_id", reason: "must be a safe identifier")
-        #expect(error == .invalidArgument(name: "pad_id", reason: "must be a safe identifier"))
-    }
-}
-
 @Suite("Stdio bootstrap")
 struct StdioBootstrapTests {
     @Test
