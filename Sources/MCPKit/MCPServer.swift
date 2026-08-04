@@ -66,7 +66,7 @@ public struct MCPServer {
         }
 
         await server.withMethodHandler(CallTool.self) { params in
-            await provider.callTool(params.name, arguments: params.arguments)
+            try await provider.callTool(params.name, arguments: params.arguments)
         }
 
         await server.withMethodHandler(ListPrompts.self) { _ in
