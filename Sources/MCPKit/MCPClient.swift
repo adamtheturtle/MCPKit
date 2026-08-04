@@ -101,7 +101,7 @@ public enum MCPClient: String, CaseIterable, Identifiable, Sendable {
         case .command:
             // Claude Code registers an MCP server from the CLI; `--` separates the host app's
             // own args from claude's so `--mcp` reaches the host binary.
-            return "claude mcp add \(serverName) -- \"\(command)\" --mcp"
+            return "claude mcp add \(posixShellArgument(serverName)) -- \(posixShellArgument(command)) --mcp"
 
         case .toml:
             return """
@@ -131,5 +131,11 @@ public enum MCPClient: String, CaseIterable, Identifiable, Sendable {
                 escaped.unicodeScalars.append(scalar)
             }
         }
+    }
+
+    /// Quotes one argument for a POSIX shell. Single-quoted text is interpreted literally;
+    /// an embedded quote is represented by ending the quote, escaping it, and reopening it.
+    private func posixShellArgument(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
