@@ -13,7 +13,7 @@ import Testing
 @testable import MCPKit
 
 /// A small `Codable & Sendable` entry for exercising `JSONLLog` round-trips.
-private struct LogRow: Codable, Sendable, Equatable {
+struct LogRow: Codable, Sendable, Equatable {
     let n: Int
     let text: String
 }

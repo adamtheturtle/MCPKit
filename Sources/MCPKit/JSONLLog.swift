@@ -41,6 +41,10 @@ private final class SerializedCoder<Coder>: @unchecked Sendable {
     }
 }
 
+private final class FileOperationLock: @unchecked Sendable {
+    let lock = NSLock()
+}
+
 /// An append-only JSONL log of `Entry` values, shared by a GUI reader and one or more
 /// headless writer processes via a file in a directory both can reach.
 ///
@@ -62,6 +66,8 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
 
     private let encode: @Sendable (Entry) -> Data?
     private let decode: @Sendable (Data) -> Entry?
+    private let operationLock: FileOperationLock
+    private let beforeAppendWrite: (@Sendable () -> Void)?
 
     /// Creates a log at `directory/fileName`, keeping at most `maxEntries`.
     ///
@@ -74,9 +80,29 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
         encoder: JSONEncoder = JSONLLog.iso8601Encoder,
         decoder: JSONDecoder = JSONLLog.iso8601Decoder
     ) {
+        self.init(
+            directory: directory,
+            fileName: fileName,
+            maxEntries: maxEntries,
+            encoder: encoder,
+            decoder: decoder,
+            beforeAppendWrite: nil
+        )
+    }
+
+    init(
+        directory: URL,
+        fileName: String,
+        maxEntries: Int,
+        encoder: JSONEncoder = JSONLLog.iso8601Encoder,
+        decoder: JSONDecoder = JSONLLog.iso8601Decoder,
+        beforeAppendWrite: (@Sendable () -> Void)?
+    ) {
         self.directory = directory
         self.fileName = fileName
         self.maxEntries = max(0, maxEntries)
+        operationLock = FileOperationLock()
+        self.beforeAppendWrite = beforeAppendWrite
         let serializedEncoder = SerializedCoder(encoder)
         let serializedDecoder = SerializedCoder(decoder)
         encode = { entry in
@@ -117,9 +143,32 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
         return directory.appending(path: fileName)
     }
 
+    /// Serializes pathname-replacing operations with appenders in this process and in
+    /// other processes using the same adjacent lock file.
+    private func withExclusiveFileLock(_ operation: (URL) -> Void) {
+        operationLock.lock.lock()
+        defer { operationLock.lock.unlock() }
+        guard let url = fileURL else { return }
+
+        let lockURL = url.appendingPathExtension("lock")
+        let descriptor = lockURL.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+
+            return open(path, O_WRONLY | O_CREAT, 0o600)
+        }
+        guard descriptor >= 0 else { return }
+
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
+        defer { try? handle.close() }
+        guard fchmod(descriptor, 0o600) == 0, flock(descriptor, LOCK_EX) == 0 else { return }
+        defer { _ = flock(descriptor, LOCK_UN) }
+
+        operation(url)
+    }
+
     /// Appends `entry` as one JSON line, creating the file if it doesn't exist yet.
     ///
-    /// The file is opened `O_WRONLY|O_APPEND|O_CREAT`, so the kernel positions each write
+    /// The file is opened `O_RDWR|O_APPEND|O_CREAT`, so the kernel positions each write
     /// at the current end of file as part of the write itself. That is what makes the
     /// multi-process appending this type is designed for safe: two `--mcp` processes
     /// writing at once can't resolve the same offset and overwrite one another. A
@@ -129,41 +178,43 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     /// dropped: a log line is never worth failing a tool call over, and - crucially - a
     /// log the process can't write to is left exactly as it is rather than replaced.
     public func append(_ entry: Entry) {
-        guard let url = fileURL,
-              let data = encode(entry),
+        guard let data = encode(entry),
               let line = String(data: data, encoding: .utf8) else { return }
 
-        let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
-            guard let path else { return -1 }
+        withExclusiveFileLock { url in
+            let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+                guard let path else { return -1 }
 
-            return open(path, O_RDWR | O_APPEND | O_CREAT, 0o600)
-        }
-        guard descriptor >= 0 else { return }
-
-        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
-        defer { try? handle.close() }
-        // Activity can contain account and tool metadata. Tighten pre-existing files too,
-        // rather than applying the private default only on first creation.
-        guard fchmod(descriptor, 0o600) == 0 else { return }
-
-        var metadata = stat()
-        guard fstat(descriptor, &metadata) == 0 else { return }
-
-        var payload = Data()
-        if metadata.st_size > 0 {
-            var lastByte: UInt8 = 0
-            let bytesRead = withUnsafeMutableBytes(of: &lastByte) { bytes in
-                pread(descriptor, bytes.baseAddress, 1, metadata.st_size - 1)
+                return open(path, O_RDWR | O_APPEND | O_CREAT, 0o600)
             }
-            guard bytesRead == 1 else { return }
+            guard descriptor >= 0 else { return }
 
-            // A crashed writer can leave an unterminated final line. Separate it from the
-            // next valid entry so tolerant loading skips only the torn record.
-            if lastByte != UInt8(ascii: "\n") { payload.append(UInt8(ascii: "\n")) }
+            let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
+            defer { try? handle.close() }
+            // Activity can contain account and tool metadata. Tighten pre-existing files too,
+            // rather than applying the private default only on first creation.
+            guard fchmod(descriptor, 0o600) == 0 else { return }
+            beforeAppendWrite?()
+
+            var metadata = stat()
+            guard fstat(descriptor, &metadata) == 0 else { return }
+
+            var payload = Data()
+            if metadata.st_size > 0 {
+                var lastByte: UInt8 = 0
+                let bytesRead = withUnsafeMutableBytes(of: &lastByte) { bytes in
+                    pread(descriptor, bytes.baseAddress, 1, metadata.st_size - 1)
+                }
+                guard bytesRead == 1 else { return }
+
+                // A crashed writer can leave an unterminated final line. Separate it from the
+                // next valid entry so tolerant loading skips only the torn record.
+                if lastByte != UInt8(ascii: "\n") { payload.append(UInt8(ascii: "\n")) }
+            }
+            payload.append(contentsOf: line.utf8)
+            payload.append(UInt8(ascii: "\n"))
+            try? handle.write(contentsOf: payload)
         }
-        payload.append(contentsOf: line.utf8)
-        payload.append(UInt8(ascii: "\n"))
-        try? handle.write(contentsOf: payload)
     }
 
     /// The stored entries, oldest first, capped to the last `maxEntries`. Decodes
@@ -190,18 +241,20 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     /// cap, so the log can't grow without bound. Call from the single GUI reader after a
     /// load, so it doesn't race the headless appenders. A no-op when already within the cap.
     public func trim() {
-        guard let url = fileURL else { return }
+        withExclusiveFileLock { url in
+            guard let data = try? Data(contentsOf: url) else { return }
 
-        let lines = rawLines()
-        let validLines = lines.filter { decode(Data($0)) != nil }
-        guard validLines.count != lines.count || validLines.count > maxEntries else { return }
+            let lines = data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
+            let validLines = lines.filter { decode(Data($0)) != nil }
+            guard validLines.count != lines.count || validLines.count > maxEntries else { return }
 
-        var trimmed = Data()
-        for line in validLines.suffix(maxEntries) {
-            trimmed.append(contentsOf: line)
-            trimmed.append(UInt8(ascii: "\n"))
+            var trimmed = Data()
+            for line in validLines.suffix(maxEntries) {
+                trimmed.append(contentsOf: line)
+                trimmed.append(UInt8(ascii: "\n"))
+            }
+            try? trimmed.write(to: url, options: .atomic)
         }
-        try? trimmed.write(to: url, options: .atomic)
     }
 
     /// Deletes the log file, e.g. so it doesn't outlive the data it describes.
