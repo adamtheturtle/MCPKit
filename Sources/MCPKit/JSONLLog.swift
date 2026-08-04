@@ -133,11 +133,10 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
               let data = encode(entry),
               let line = String(data: data, encoding: .utf8) else { return }
 
-        let payload = Data((line + "\n").utf8)
         let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
             guard let path else { return -1 }
 
-            return open(path, O_WRONLY | O_APPEND | O_CREAT, 0o600)
+            return open(path, O_RDWR | O_APPEND | O_CREAT, 0o600)
         }
         guard descriptor >= 0 else { return }
 
@@ -147,6 +146,23 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
         // rather than applying the private default only on first creation.
         guard fchmod(descriptor, 0o600) == 0 else { return }
 
+        var metadata = stat()
+        guard fstat(descriptor, &metadata) == 0 else { return }
+
+        var payload = Data()
+        if metadata.st_size > 0 {
+            var lastByte: UInt8 = 0
+            let bytesRead = withUnsafeMutableBytes(of: &lastByte) { bytes in
+                pread(descriptor, bytes.baseAddress, 1, metadata.st_size - 1)
+            }
+            guard bytesRead == 1 else { return }
+
+            // A crashed writer can leave an unterminated final line. Separate it from the
+            // next valid entry so tolerant loading skips only the torn record.
+            if lastByte != UInt8(ascii: "\n") { payload.append(UInt8(ascii: "\n")) }
+        }
+        payload.append(contentsOf: line.utf8)
+        payload.append(UInt8(ascii: "\n"))
         try? handle.write(contentsOf: payload)
     }
 
