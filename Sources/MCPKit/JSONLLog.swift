@@ -23,6 +23,24 @@
 
 import Foundation
 
+/// Foundation's JSON coders expose mutable configuration and do not promise that one
+/// instance can be used by several callers simultaneously. Keep each caller-supplied
+/// coder behind its own lock while preserving its exact custom strategies and user info.
+private final class SerializedCoder<Coder>: @unchecked Sendable {
+    private let coder: Coder
+    private let lock = NSLock()
+
+    init(_ coder: Coder) {
+        self.coder = coder
+    }
+
+    func use<Result>(_ operation: (Coder) throws -> Result) rethrows -> Result {
+        lock.lock()
+        defer { lock.unlock() }
+        return try operation(coder)
+    }
+}
+
 /// An append-only JSONL log of `Entry` values, shared by a GUI reader and one or more
 /// headless writer processes via a file in a directory both can reach.
 ///
@@ -57,10 +75,14 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
         self.directory = directory
         self.fileName = fileName
         self.maxEntries = maxEntries
-        // Capture the coders behind Sendable closures so the struct stays Sendable
-        // (JSONEncoder/JSONDecoder are reference types).
-        encode = { try? encoder.encode($0) }
-        decode = { try? decoder.decode(Entry.self, from: $0) }
+        let serializedEncoder = SerializedCoder(encoder)
+        let serializedDecoder = SerializedCoder(decoder)
+        encode = { entry in
+            try? serializedEncoder.use { try $0.encode(entry) }
+        }
+        decode = { data in
+            try? serializedDecoder.use { try $0.decode(Entry.self, from: data) }
+        }
     }
 
     /// A JSON encoder writing dates as ISO-8601 - the default for a `JSONLLog`.
