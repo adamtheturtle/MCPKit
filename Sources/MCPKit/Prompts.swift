@@ -20,19 +20,47 @@ public enum PromptError: Swift.Error, Equatable {
     case invalidArgument(name: String, reason: String)
 }
 
-/// A trimmed, non-empty value for `key` in a prompt's arguments, or nil.
-public func promptArgument(_ arguments: [String: String]?, _ key: String) -> String? {
-    guard let raw = arguments?[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty
-    else { return nil }
+/// The largest prompt argument these helpers return, measured as UTF-8 bytes.
+public let maximumPromptArgumentUTF8Length = 16 * 1_024
 
-    return raw
+private enum PromptArgumentValidation {
+    case missing
+    case invalid(String)
+    case valid(String)
 }
 
-/// A single required prompt argument, throwing `PromptError.missingArgument` when absent.
-public func requiredPromptArgument(_ arguments: [String: String]?, _ key: String) throws -> String {
-    guard let value = promptArgument(arguments, key) else { throw PromptError.missingArgument(key) }
+private func validatePromptArgument(_ arguments: [String: String]?, _ key: String) -> PromptArgumentValidation {
+    guard let raw = arguments?[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty
+    else { return .missing }
+
+    guard raw.utf8.count <= maximumPromptArgumentUTF8Length else {
+        return .invalid("must be at most \(maximumPromptArgumentUTF8Length) UTF-8 bytes")
+    }
+    guard !raw.unicodeScalars.contains(where: { $0.properties.generalCategory == .format }) else {
+        return .invalid("must not contain Unicode format controls")
+    }
+    return .valid(raw)
+}
+
+/// A trimmed, non-empty, bounded value for `key` in a prompt's arguments, or nil when
+/// absent or unsafe. Unicode format controls are rejected so bidi overrides and invisible
+/// separators cannot be interpolated into rendered prompts or diagnostics.
+public func promptArgument(_ arguments: [String: String]?, _ key: String) -> String? {
+    guard case let .valid(value) = validatePromptArgument(arguments, key) else { return nil }
 
     return value
+}
+
+/// A single required prompt argument, distinguishing an absent value from an unsafe one.
+public func requiredPromptArgument(_ arguments: [String: String]?, _ key: String) throws -> String {
+    switch validatePromptArgument(arguments, key) {
+    case .missing:
+        throw PromptError.missingArgument(key)
+    case let .invalid(reason):
+        throw PromptError.invalidArgument(name: key, reason: reason)
+    case let .valid(value):
+        return value
+    }
 }
 
 /// A user-role text message, the common building block of a rendered prompt.
