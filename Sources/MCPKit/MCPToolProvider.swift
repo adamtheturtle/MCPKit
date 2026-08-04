@@ -25,7 +25,7 @@ public protocol MCPToolProvider: Sendable {
 
     /// Handle a `tools/call`. The provider resolves the target account, enforces any
     /// write opt-in, dispatches to its backend, and shapes the result.
-    func callTool(_ name: String, arguments: [String: Value]?) async -> CallTool.Result
+    func callTool(_ name: String, arguments: [String: Value]?) async throws -> CallTool.Result
 
     /// The prompt templates to advertise from `prompts/list`. Defaults to none.
     func prompts() async -> [Prompt]

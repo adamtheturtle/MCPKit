@@ -218,6 +218,16 @@ private struct ToolsOnlyProvider: MCPToolProvider {
     }
 }
 
+private struct ThrowingToolProvider: MCPToolProvider {
+    func tools() async -> [Tool] {
+        [Tool(name: "fail", description: "Fails.", inputSchema: .object([:]))]
+    }
+
+    func callTool(_ name: String, arguments _: [String: Value]?) async throws -> CallTool.Result {
+        throw MCPError.invalidParams("Provider rejected \(name)")
+    }
+}
+
 @Suite("MCPToolProvider defaults")
 struct ProviderDefaultTests {
     private let provider = ToolsOnlyProvider()
@@ -250,5 +260,22 @@ struct ProviderDefaultTests {
         await #expect(throws: (any Error).self) {
             try await provider.readResource("app://nope")
         }
+    }
+
+    @Test
+    func `tool errors propagate through the server handler`() async throws {
+        let (clientTransport, serverTransport) = await InMemoryTransport.createConnectedPair()
+        let client = Client(name: "TestClient", version: "1.0")
+        let server = MCPServer(name: "TestServer", version: "1.0", provider: ThrowingToolProvider())
+
+        try await server.start(transport: serverTransport)
+        _ = try await client.connect(transport: clientTransport)
+
+        let context: RequestContext<CallTool.Result> = try await client.callTool(name: "fail", arguments: nil)
+        await #expect(throws: (any Error).self) {
+            try await context.value
+        }
+
+        await client.disconnect()
     }
 }
