@@ -27,6 +27,11 @@ struct ArgumentTests {
         #expect(stringArgument(nil, "s") == nil)
     }
 
+    @Test(arguments: [Double.nan, .infinity, -.infinity])
+    func `stringArgument rejects non-finite doubles`(_ value: Double) {
+        #expect(stringArgument(["value": .double(value)], "value") == nil)
+    }
+
     @Test
     func `intArgument truncates doubles and parses numeric strings`() {
         let args: [String: Value] = ["i": .int(7), "d": .double(3.9), "s": .string("42"), "bad": .string("nope")]
