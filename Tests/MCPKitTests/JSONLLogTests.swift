@@ -13,7 +13,7 @@ import Testing
 @testable import MCPKit
 
 /// A small `Codable & Sendable` entry for exercising `JSONLLog` round-trips.
-private struct LogRow: Codable, Sendable, Equatable {
+struct LogRow: Codable, Sendable, Equatable {
     let n: Int
     let text: String
 }
@@ -119,23 +119,6 @@ struct JSONLLogTests {
 
         // The last three appended survive the read cap, oldest of those first.
         #expect(log.load().map(\.n) == [8, 9, 10])
-    }
-
-    @Test
-    func `load reads only a bounded tail of a large file`() throws {
-        let (log, directory) = makeLog(maxEntries: 2)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appending(path: "log.jsonl")
-        var oversizedPrefix = Data(repeating: UInt8(ascii: "x"), count: maximumJSONLLoadBytes * 2)
-        oversizedPrefix.append(UInt8(ascii: "\n"))
-        try oversizedPrefix.write(to: url)
-        for n in 1 ... 3 { log.append(LogRow(n: n, text: "\(n)")) }
-
-        let tail = try #require(boundedTailData(from: url, maximumBytes: maximumJSONLLoadBytes))
-        #expect(tail.count <= maximumJSONLLoadBytes)
-        #expect(tail.first != UInt8(ascii: "x"))
-        #expect(log.load().map(\.n) == [2, 3])
     }
 
     @Test

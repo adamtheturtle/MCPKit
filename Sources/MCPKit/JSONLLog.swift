@@ -34,10 +34,11 @@ func boundedTailData(from url: URL, maximumBytes: Int) -> Data? {
 
     guard let fileSize = try? handle.seekToEnd() else { return nil }
     let byteLimit = UInt64(maximumBytes)
-    let readStart = fileSize > byteLimit ? fileSize - byteLimit - 1 : 0
+    let windowStart = fileSize > byteLimit ? fileSize - byteLimit : 0
+    let readStart = windowStart > 0 ? windowStart - 1 : 0
     guard (try? handle.seek(toOffset: readStart)) != nil,
           let data = try? handle.read(upToCount: Int(fileSize - readStart)) else { return nil }
-    guard readStart > 0 else { return data }
+    guard windowStart > 0 else { return data }
 
     // The extra byte immediately before the bounded window tells us whether its first
     // byte starts a line. Otherwise discard the partial line through its newline.
