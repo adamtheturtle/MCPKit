@@ -15,10 +15,10 @@
 //  are append-only and go through an `O_APPEND` descriptor, where the kernel makes the
 //  position-and-write a single step - the property the multi-process design rests on.
 //  Reads split the file's bytes and decode each line separately, so a line damaged by
-//  anything else on the system doesn't take the rest of the log with it. Trimming to the
-//  last N entries is done by the single GUI reader when it loads, avoiding multi-process
-//  rewrite races. Every member is nonisolated, so the headless server can append from any
-//  context.
+//  anything else on the system doesn't take the rest of the log with it. Appending and
+//  pathname-replacing maintenance share an adjacent `flock` across processes, so trim
+//  cannot orphan a writer's open inode. Every member is nonisolated, so the headless
+//  server can append from any context.
 //
 
 import Foundation
@@ -238,8 +238,8 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     }
 
     /// Rewrites the file to only its last `maxEntries` lines when it has grown past the
-    /// cap, so the log can't grow without bound. Call from the single GUI reader after a
-    /// load, so it doesn't race the headless appenders. A no-op when already within the cap.
+    /// cap, so the log can't grow without bound. Serialized with headless appenders through
+    /// the adjacent lock file. A no-op when already within the cap.
     public func trim() {
         withExclusiveFileLock { url in
             guard let data = try? Data(contentsOf: url) else { return }
