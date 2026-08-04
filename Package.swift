@@ -16,7 +16,9 @@ let package = Package(
     ],
     dependencies: [
         // The official Model Context Protocol Swift SDK, which MCPKit builds on.
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.1")
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.1"),
+        // Used only by tests to verify that generated Codex snippets are valid TOML.
+        .package(url: "https://github.com/dduan/TOMLDecoder.git", from: "0.4.5")
     ],
     targets: [
         .target(
@@ -37,7 +39,7 @@ let package = Package(
         ),
         .testTarget(
             name: "MCPKitTests",
-            dependencies: ["MCPKit", "MCPKitStdioFailureFixture"],
+            dependencies: ["MCPKit", "MCPKitStdioFailureFixture", "TOMLDecoder"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]

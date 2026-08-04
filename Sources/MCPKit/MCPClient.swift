@@ -105,10 +105,31 @@ public enum MCPClient: String, CaseIterable, Identifiable, Sendable {
 
         case .toml:
             return """
-            [mcp_servers.\(serverName)]
-            command = "\(command)"
+            [mcp_servers."\(tomlBasicStringContents(serverName))"]
+            command = "\(tomlBasicStringContents(command))"
             args = ["--mcp"]
             """
+        }
+    }
+
+    /// Escapes a value for the contents of a single-line TOML basic string. Quoted table
+    /// keys and string values use the same grammar, so one routine protects both dynamic
+    /// fields in the Codex snippet.
+    private func tomlBasicStringContents(_ value: String) -> String {
+        value.unicodeScalars.reduce(into: "") { escaped, scalar in
+            switch scalar.value {
+            case 0x08: escaped += "\\b"
+            case 0x09: escaped += "\\t"
+            case 0x0A: escaped += "\\n"
+            case 0x0C: escaped += "\\f"
+            case 0x0D: escaped += "\\r"
+            case 0x22: escaped += "\\\""
+            case 0x5C: escaped += "\\\\"
+            case 0x00 ... 0x1F, 0x7F:
+                escaped += String(format: "\\u%04X", scalar.value)
+            default:
+                escaped.unicodeScalars.append(scalar)
+            }
         }
     }
 }
