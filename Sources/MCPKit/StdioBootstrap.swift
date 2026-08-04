@@ -49,7 +49,7 @@ public extension MCPServer {
     ///   recording the launch in an activity log. Defaults to a no-op.
     ///
     /// Failures starting or running the server are logged to standard error (prefixed with
-    /// `name`) and the process still exits cleanly.
+    /// `name`) and exit with `EXIT_FAILURE`.
     ///
     /// Called from the main thread (the usual case, a host's `main`), this drives the main
     /// queue instead of blocking, so the main actor stays live: a provider is free to read
@@ -81,22 +81,35 @@ public extension MCPServer {
 
         onLaunch()
 
-        // Bridge the SDK's async server to this synchronous, never-returning entry point.
-        // The server runs as a detached task and ends the process itself when the
-        // transport closes, so nothing here has to wait for it.
-        Task {
+        runOperationUntilExit(name: name) {
             let server = MCPServer(
                 name: name,
                 version: version,
                 capabilities: capabilities,
                 provider: provider
             )
+            try await server.run(transport: StdioTransport())
+        }
+    }
+
+    /// Runs an asynchronous server operation and owns process termination. Package access
+    /// keeps the exit behavior available to the subprocess regression fixture without
+    /// exposing a second public bootstrap API.
+    package static func runOperationUntilExit(
+        name: String,
+        operation: @escaping @Sendable () async throws -> Void
+    ) -> Never {
+        // Bridge the SDK's async server to this synchronous, never-returning entry point.
+        // The operation runs as a task and ends the process itself when the
+        // transport closes, so nothing here has to wait for it.
+        Task {
             do {
-                try await server.run(transport: StdioTransport())
+                try await operation()
             } catch {
                 FileHandle.standardError.write(Data("\(name) MCP server failed to start: \(error)\n".utf8))
+                exit(EXIT_FAILURE)
             }
-            exit(0)
+            exit(EXIT_SUCCESS)
         }
 
         if Thread.isMainThread {

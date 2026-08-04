@@ -29,9 +29,15 @@ let package = Package(
             // the SDK expects, under the Swift 6 language mode.
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .executableTarget(
+            name: "MCPKitStdioFailureFixture",
+            dependencies: ["MCPKit"],
+            path: "Tests/StdioFailureFixture",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "MCPKitTests",
-            dependencies: ["MCPKit"],
+            dependencies: ["MCPKit", "MCPKitStdioFailureFixture"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]
