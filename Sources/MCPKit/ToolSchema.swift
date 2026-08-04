@@ -10,6 +10,7 @@
 //  bridge; the catalog content itself stays app-side.
 //
 
+import CoreFoundation
 import Foundation
 import MCP
 
@@ -19,6 +20,7 @@ import MCP
 public func mcpValue(_ any: Any) -> Value {
     switch any {
     case let value as Value: value
+    case let number as NSNumber: mcpNumber(number)
     case let bool as Bool: .bool(bool)
     case let int as Int: .int(int)
     case let double as Double: .double(double)
@@ -26,6 +28,23 @@ public func mcpValue(_ any: Any) -> Value {
     case let array as [Any]: .array(array.map(mcpValue))
     case let object as [String: Any]: .object(object.mapValues(mcpValue))
     default: .null
+    }
+}
+
+private func mcpNumber(_ number: NSNumber) -> Value {
+    guard CFGetTypeID(number) != CFBooleanGetTypeID() else {
+        return .bool(number.boolValue)
+    }
+
+    switch String(cString: number.objCType) {
+    case "c", "s", "i", "l", "q":
+        let value = number.int64Value
+        return Int(exactly: value).map(Value.int) ?? .double(number.doubleValue)
+    case "C", "S", "I", "L", "Q":
+        let value = number.uint64Value
+        return Int(exactly: value).map(Value.int) ?? .double(number.doubleValue)
+    default:
+        return .double(number.doubleValue)
     }
 }
 

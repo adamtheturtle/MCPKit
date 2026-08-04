@@ -85,6 +85,17 @@ struct ToolSchemaTests {
     }
 
     @Test
+    func `mcpValue preserves Foundation and fixed-width numbers`() {
+        #expect(mcpValue(NSNumber(value: true)) == .bool(true))
+        #expect(mcpValue(NSNumber(value: 1)) == .int(1))
+        #expect(mcpValue(Int64.min) == .int(Int.min))
+        #expect(mcpValue(Int64.max) == .int(Int.max))
+        #expect(mcpValue(UInt(42)) == .int(42))
+        #expect(mcpValue(Float(1.25)) == .double(1.25))
+        #expect(mcpValue(UInt64.max) == .double(Double(UInt64.max)))
+    }
+
+    @Test
     func `mcpTool reads name, description, schema and annotations`() {
         let descriptor: [String: Any] = [
             "name": "list_things",
