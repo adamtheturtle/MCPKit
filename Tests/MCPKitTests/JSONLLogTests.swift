@@ -213,6 +213,23 @@ struct JSONLLogTests {
     }
 
     @Test
+    func `append separates a new entry from a torn final line`() throws {
+        let (log, directory) = makeLog(maxEntries: 30)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        log.append(LogRow(n: 1, text: "before"))
+        let url = directory.appending(path: "log.jsonl")
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data("{\"n\":2".utf8))
+        try handle.close()
+
+        log.append(LogRow(n: 3, text: "after"))
+
+        #expect(log.load() == [LogRow(n: 1, text: "before"), LogRow(n: 3, text: "after")])
+    }
+
+    @Test
     func `trim still compacts a file holding invalid UTF-8`() throws {
         let (log, directory) = makeLog(maxEntries: 3)
         defer { try? FileManager.default.removeItem(at: directory) }
