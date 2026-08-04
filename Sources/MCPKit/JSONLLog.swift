@@ -23,6 +23,30 @@
 
 import Foundation
 
+/// Maximum bytes `JSONLLog.load()` reads from the tail of its file. A single entry larger
+/// than this limit is skipped rather than allowing an untrusted log to drive unbounded
+/// memory use.
+public let maximumJSONLLoadBytes = 1 * 1_024 * 1_024
+
+func boundedTailData(from url: URL, maximumBytes: Int) -> Data? {
+    guard maximumBytes > 0, let handle = try? FileHandle(forReadingFrom: url) else { return Data() }
+    defer { try? handle.close() }
+
+    guard let fileSize = try? handle.seekToEnd() else { return nil }
+    let byteLimit = UInt64(maximumBytes)
+    let readStart = fileSize > byteLimit ? fileSize - byteLimit - 1 : 0
+    guard (try? handle.seek(toOffset: readStart)) != nil,
+          let data = try? handle.read(upToCount: Int(fileSize - readStart)) else { return nil }
+    guard readStart > 0 else { return data }
+
+    // The extra byte immediately before the bounded window tells us whether its first
+    // byte starts a line. Otherwise discard the partial line through its newline.
+    if data.first == UInt8(ascii: "\n") { return Data(data.dropFirst()) }
+    guard let newline = data.firstIndex(of: UInt8(ascii: "\n")) else { return Data() }
+
+    return Data(data[data.index(after: newline)...])
+}
+
 /// Foundation's JSON coders expose mutable configuration and do not promise that one
 /// instance can be used by several callers simultaneously. Keep each caller-supplied
 /// coder behind its own lock while preserving its exact custom strategies and user info.
@@ -154,8 +178,19 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     /// tolerantly: a malformed line - torn JSON, or bytes that aren't even valid UTF-8 -
     /// is skipped rather than failing the whole read. An absent file reads as empty.
     public func load() -> [Entry] {
-        let entries = rawLines().compactMap { decode(Data($0)) }
+        guard maxEntries > 0 else { return [] }
+
+        let entries = tailLines().compactMap { decode(Data($0)) }
         return Array(entries.suffix(maxEntries))
+    }
+
+    /// Reads a bounded tail window for normal loads. If the window begins part-way through
+    /// a record, that partial record is omitted while all later complete lines survive.
+    private func tailLines() -> [Data.SubSequence] {
+        guard let url = fileURL,
+              let data = boundedTailData(from: url, maximumBytes: maximumJSONLLoadBytes) else { return [] }
+
+        return data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
     }
 
     /// The file's newline-separated lines as raw bytes, empty when it can't be read.
