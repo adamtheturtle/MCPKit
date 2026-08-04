@@ -25,6 +25,8 @@ struct JSONLLogLockingTests {
         let allowAppend = DispatchSemaphore(value: 0)
         let appendFinished = DispatchSemaphore(value: 0)
         let trimFinished = DispatchSemaphore(value: 0)
+        let appendQueue = DispatchQueue(label: "JSONLLogLockingTests.trim.append")
+        let trimQueue = DispatchQueue(label: "JSONLLogLockingTests.trim.maintenance")
         let log = JSONLLog<LogRow>(
             directory: directory,
             fileName: "log.jsonl",
@@ -35,12 +37,12 @@ struct JSONLLogLockingTests {
             }
         )
 
-        DispatchQueue.global().async {
+        appendQueue.async {
             log.append(LogRow(n: 1, text: "new"))
             appendFinished.signal()
         }
         #expect(appendOpened.wait(timeout: .now() + 2) == .success)
-        DispatchQueue.global().async {
+        trimQueue.async {
             log.trim()
             trimFinished.signal()
         }
@@ -61,6 +63,8 @@ struct JSONLLogLockingTests {
         let allowClear = DispatchSemaphore(value: 0)
         let clearFinished = DispatchSemaphore(value: 0)
         let appendFinished = DispatchSemaphore(value: 0)
+        let clearQueue = DispatchQueue(label: "JSONLLogLockingTests.clear.maintenance")
+        let appendQueue = DispatchQueue(label: "JSONLLogLockingTests.clear.append")
         let log = JSONLLog<LogRow>(
             directory: directory,
             fileName: "log.jsonl",
@@ -73,12 +77,12 @@ struct JSONLLogLockingTests {
         )
         log.append(LogRow(n: 0, text: "before-clear"))
 
-        DispatchQueue.global().async {
+        clearQueue.async {
             log.clear()
             clearFinished.signal()
         }
         #expect(clearStarted.wait(timeout: .now() + 2) == .success)
-        DispatchQueue.global().async {
+        appendQueue.async {
             log.append(LogRow(n: 1, text: "after-clear"))
             appendFinished.signal()
         }
