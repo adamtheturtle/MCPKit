@@ -271,6 +271,47 @@ struct JSONLLogTests {
     }
 
     @Test
+    func `traversal filenames cannot append trim or clear outside the log directory`() throws {
+        let parent = FileManager.default.temporaryDirectory
+            .appending(path: "JSONLLogTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let directory = parent.appending(path: "logs", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: parent) }
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        let sentinel = Data("outside\n".utf8)
+
+        let appendTarget = parent.appending(path: "append.jsonl")
+        try sentinel.write(to: appendTarget)
+        JSONLLog<LogRow>(directory: directory, fileName: "../append.jsonl", maxEntries: 1)
+            .append(LogRow(n: 1, text: "escaped"))
+        #expect(try Data(contentsOf: appendTarget) == sentinel)
+
+        let trimTarget = parent.appending(path: "trim.jsonl")
+        try sentinel.write(to: trimTarget)
+        JSONLLog<LogRow>(directory: directory, fileName: "../trim.jsonl", maxEntries: 0).trim()
+        #expect(try Data(contentsOf: trimTarget) == sentinel)
+
+        let clearTarget = parent.appending(path: "clear.jsonl")
+        try sentinel.write(to: clearTarget)
+        JSONLLog<LogRow>(directory: directory, fileName: "../clear.jsonl", maxEntries: 1).clear()
+        #expect(try Data(contentsOf: clearTarget) == sentinel)
+    }
+
+    @Test(arguments: ["", ".", "..", "nested/log.jsonl", "nested\\log.jsonl", "nul\0name"])
+    func `non-filename components disable file operations`(_ fileName: String) {
+        let parent = FileManager.default.temporaryDirectory
+            .appending(path: "JSONLLogTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let directory = parent.appending(path: "logs", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        let log = JSONLLog<LogRow>(directory: directory, fileName: fileName, maxEntries: 1)
+        log.append(LogRow(n: 1, text: "blocked"))
+        log.trim()
+        log.clear()
+
+        #expect(!FileManager.default.fileExists(atPath: directory.path))
+    }
+
+    @Test
     func `clear removes the file so load returns empty`() {
         let (log, directory) = makeLog(maxEntries: 30)
         defer { try? FileManager.default.removeItem(at: directory) }
