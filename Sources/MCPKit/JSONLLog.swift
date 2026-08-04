@@ -93,6 +93,7 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     private let decode: @Sendable (Data) -> Entry?
     private let operationLock: FileOperationLock
     private let beforeAppendWrite: (@Sendable () -> Void)?
+    private let beforeClearRemove: (@Sendable () -> Void)?
 
     /// Creates a log at `directory/fileName`, keeping at most `maxEntries`.
     ///
@@ -111,7 +112,8 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
             maxEntries: maxEntries,
             encoder: encoder,
             decoder: decoder,
-            beforeAppendWrite: nil
+            beforeAppendWrite: nil,
+            beforeClearRemove: nil
         )
     }
 
@@ -121,13 +123,15 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
         maxEntries: Int,
         encoder: JSONEncoder = JSONLLog.iso8601Encoder,
         decoder: JSONDecoder = JSONLLog.iso8601Decoder,
-        beforeAppendWrite: (@Sendable () -> Void)?
+        beforeAppendWrite: (@Sendable () -> Void)?,
+        beforeClearRemove: (@Sendable () -> Void)? = nil
     ) {
         self.directory = directory
         self.fileName = fileName
         self.maxEntries = max(0, maxEntries)
         operationLock = FileOperationLock()
         self.beforeAppendWrite = beforeAppendWrite
+        self.beforeClearRemove = beforeClearRemove
         let serializedEncoder = SerializedCoder(encoder)
         let serializedDecoder = SerializedCoder(decoder)
         encode = { entry in
@@ -295,8 +299,10 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
 
     /// Deletes the log file, e.g. so it doesn't outlive the data it describes.
     public func clear() {
-        guard let url = fileURL else { return }
+        withExclusiveFileLock { url in
+            beforeClearRemove?()
 
-        try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 }
