@@ -254,6 +254,23 @@ struct JSONLLogTests {
     }
 
     @Test
+    func `append creates and maintains an owner-only log file`() throws {
+        let (log, directory) = makeLog(maxEntries: 30)
+        let url = directory.appending(path: "log.jsonl")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        log.append(LogRow(n: 1, text: "private"))
+        var attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+        log.append(LogRow(n: 2, text: "tightened"))
+        attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+        #expect(log.load().map(\.n) == [1, 2])
+    }
+
+    @Test
     func `clear removes the file so load returns empty`() {
         let (log, directory) = makeLog(maxEntries: 30)
         defer { try? FileManager.default.removeItem(at: directory) }

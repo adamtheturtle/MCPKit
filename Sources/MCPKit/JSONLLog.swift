@@ -129,12 +129,16 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
         let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
             guard let path else { return -1 }
 
-            return open(path, O_WRONLY | O_APPEND | O_CREAT, 0o644)
+            return open(path, O_WRONLY | O_APPEND | O_CREAT, 0o600)
         }
         guard descriptor >= 0 else { return }
 
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
         defer { try? handle.close() }
+        // Activity can contain account and tool metadata. Tighten pre-existing files too,
+        // rather than applying the private default only on first creation.
+        guard fchmod(descriptor, 0o600) == 0 else { return }
+
         try? handle.write(contentsOf: payload)
     }
 
