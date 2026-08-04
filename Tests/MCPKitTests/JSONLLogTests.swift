@@ -152,6 +152,26 @@ struct JSONLLogTests {
     }
 
     @Test
+    func `trim counts only decodable entries against the cap`() throws {
+        let (log, directory) = makeLog(maxEntries: 3)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        for n in 1 ... 3 { log.append(LogRow(n: n, text: "\(n)")) }
+        let url = directory.appending(path: "log.jsonl")
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data("{malformed}\nnot-json\n".utf8))
+        try handle.close()
+
+        log.trim()
+
+        #expect(log.load().map(\.n) == [1, 2, 3])
+        let lineCount = try Data(contentsOf: url)
+            .split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true).count
+        #expect(lineCount == 3)
+    }
+
+    @Test
     func `concurrent appends from several writers all survive`() {
         let writers = 4
         let perWriter = 500

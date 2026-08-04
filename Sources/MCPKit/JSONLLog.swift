@@ -169,10 +169,11 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
         guard let url = fileURL else { return }
 
         let lines = rawLines()
-        guard lines.count > maxEntries else { return }
+        let validLines = lines.filter { decode(Data($0)) != nil }
+        guard validLines.count != lines.count || validLines.count > maxEntries else { return }
 
         var trimmed = Data()
-        for line in lines.suffix(maxEntries) {
+        for line in validLines.suffix(maxEntries) {
             trimmed.append(contentsOf: line)
             trimmed.append(UInt8(ascii: "\n"))
         }
