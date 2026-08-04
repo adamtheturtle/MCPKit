@@ -49,10 +49,12 @@ private func mcpNumber(_ number: NSNumber) -> Value {
 }
 
 /// Turns one descriptor (`{ name, description, inputSchema, annotations? }`) into an
-/// `MCP.Tool`. Missing `name`/`description` default to empty and a missing
-/// `inputSchema` to an empty object, so a partial descriptor still yields a valid tool.
-public func mcpTool(from descriptor: [String: Any]) -> Tool {
-    let name = descriptor["name"] as? String ?? ""
+/// `MCP.Tool`. Returns nil when `name` is missing, mistyped, or blank. A missing
+/// description or input schema still receives a harmless default.
+public func mcpTool(from descriptor: [String: Any]) -> Tool? {
+    guard let rawName = descriptor["name"] as? String else { return nil }
+    let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty else { return nil }
     let description = descriptor["description"] as? String ?? ""
     let inputSchema = mcpValue(descriptor["inputSchema"] ?? [String: Any]())
     let annotations = (descriptor["annotations"] as? [String: Any]).map(mcpAnnotations)
@@ -73,5 +75,5 @@ public func mcpAnnotations(_ dict: [String: Any]) -> Tool.Annotations {
 /// Converts a whole catalog of JSON descriptors into the `Tool` list to advertise from
 /// `tools/list`.
 public func mcpTools(from descriptors: [[String: Any]]) -> [Tool] {
-    descriptors.map(mcpTool)
+    descriptors.compactMap(mcpTool)
 }
