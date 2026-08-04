@@ -51,7 +51,8 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     /// The directory holding the log file. Created on demand when appending.
     public let directory: URL
 
-    /// The log file's name within `directory`, e.g. `"mcp-activity.jsonl"`.
+    /// The log file's name within `directory`, e.g. `"mcp-activity.jsonl"`. File operations
+    /// are disabled unless this is one non-dot path component.
     public let fileName: String
 
     /// The most recent entries kept; older ones are dropped when the GUI calls `trim()`,
@@ -103,6 +104,13 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     /// The full path to the log file, creating `directory` if needed. Returns nil only
     /// when the directory can't be created.
     private var fileURL: URL? {
+        guard !fileName.isEmpty,
+              fileName != ".",
+              fileName != "..",
+              !fileName.contains("/"),
+              !fileName.contains("\\"),
+              !fileName.unicodeScalars.contains(where: { $0.value == 0 }) else { return nil }
+
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         guard FileManager.default.fileExists(atPath: directory.path) else { return nil }
 
