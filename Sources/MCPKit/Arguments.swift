@@ -11,13 +11,13 @@
 import Foundation
 import MCP
 
-/// A string argument, coercing ints/doubles to their textual form. Returns nil when
-/// the key is absent or holds a non-scalar value.
+/// A string argument, coercing ints and finite doubles to their textual form. Returns nil
+/// when the key is absent, holds a non-scalar value, or contains a non-finite number.
 public func stringArgument(_ arguments: [String: Value]?, _ key: String) -> String? {
     switch arguments?[key] {
     case let .string(value): value
     case let .int(value): String(value)
-    case let .double(value): String(value)
+    case let .double(value) where value.isFinite: String(value)
     default: nil
     }
 }
