@@ -55,7 +55,8 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     public let fileName: String
 
     /// The most recent entries kept; older ones are dropped when the GUI calls `trim()`,
-    /// and reads return at most this many.
+    /// and reads return at most this many. Negative initializer values are normalized to
+    /// zero so untrusted configuration cannot reach `Collection.suffix(_:)` and trap.
     public let maxEntries: Int
 
     private let encode: @Sendable (Entry) -> Data?
@@ -74,7 +75,7 @@ public struct JSONLLog<Entry: Codable & Sendable>: Sendable {
     ) {
         self.directory = directory
         self.fileName = fileName
-        self.maxEntries = maxEntries
+        self.maxEntries = max(0, maxEntries)
         let serializedEncoder = SerializedCoder(encoder)
         let serializedDecoder = SerializedCoder(decoder)
         encode = { entry in
