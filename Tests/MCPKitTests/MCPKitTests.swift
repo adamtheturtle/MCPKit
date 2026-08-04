@@ -294,4 +294,30 @@ struct ProviderDefaultTests {
 
         await client.disconnect()
     }
+
+    @Test
+    func `tools-only servers do not register unadvertised prompt handlers`() async throws {
+        let (clientTransport, serverTransport) = await InMemoryTransport.createConnectedPair()
+        let client = Client(name: "TestClient", version: "1.0")
+        let server = MCPServer(
+            name: "TestServer",
+            version: "1.0",
+            capabilities: .init(tools: .init(listChanged: false)),
+            provider: ToolsOnlyProvider()
+        )
+
+        try await server.start(transport: serverTransport)
+        _ = try await client.connect(transport: clientTransport)
+
+        let tools = try await client.listTools()
+        #expect(tools.tools.map(\.name) == ["ping"])
+
+        let request = ListPrompts.request(.init())
+        let context: RequestContext<ListPrompts.Result> = try await client.send(request)
+        await #expect(throws: (any Error).self) {
+            try await context.value
+        }
+
+        await client.disconnect()
+    }
 }

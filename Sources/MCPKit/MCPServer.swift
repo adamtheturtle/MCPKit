@@ -22,6 +22,7 @@ import MCP
 /// `run`, keeping the returned-from handle alive without blocking on disconnect.
 public struct MCPServer {
     private let server: Server
+    private let capabilities: Server.Capabilities
     private let provider: any MCPToolProvider
 
     /// Creates a server fronting `provider`. `capabilities` defaults to advertising
@@ -38,6 +39,7 @@ public struct MCPServer {
         provider: any MCPToolProvider
     ) {
         server = Server(name: name, version: version, capabilities: capabilities)
+        self.capabilities = capabilities
         self.provider = provider
     }
 
@@ -55,46 +57,51 @@ public struct MCPServer {
         await server.waitUntilCompleted()
     }
 
-    /// Forwards each MCP method to the provider. Required methods (`tools/*`) always
-    /// resolve; optional ones use the provider's defaults (empty lists, "unknown"
-    /// errors) unless it overrides them. `PromptError` is mapped to a JSON-RPC error.
+    /// Registers only the methods represented by the advertised capabilities and
+    /// forwards them to the provider. `PromptError` is mapped to a JSON-RPC error.
     private func registerHandlers() async {
         let provider = provider
 
-        await server.withMethodHandler(ListTools.self) { _ in
-            await ListTools.Result(tools: provider.tools())
-        }
+        if capabilities.tools != nil {
+            await server.withMethodHandler(ListTools.self) { _ in
+                await ListTools.Result(tools: provider.tools())
+            }
 
-        await server.withMethodHandler(CallTool.self) { params in
-            try await provider.callTool(params.name, arguments: params.arguments)
-        }
-
-        await server.withMethodHandler(ListPrompts.self) { _ in
-            await ListPrompts.Result(prompts: provider.prompts())
-        }
-
-        await server.withMethodHandler(GetPrompt.self) { params in
-            do {
-                return try await provider.getPrompt(params.name, arguments: params.arguments)
-            } catch let PromptError.unknownPrompt(name) {
-                throw MCPError.invalidParams("Unknown prompt: \(name)")
-            } catch let PromptError.missingArgument(name) {
-                throw MCPError.invalidParams("Missing required argument: \(name)")
-            } catch let PromptError.invalidArgument(name, reason) {
-                throw MCPError.invalidParams("Invalid argument \(name): \(reason)")
+            await server.withMethodHandler(CallTool.self) { params in
+                try await provider.callTool(params.name, arguments: params.arguments)
             }
         }
 
-        await server.withMethodHandler(ListResources.self) { _ in
-            await ListResources.Result(resources: provider.resources())
+        if capabilities.prompts != nil {
+            await server.withMethodHandler(ListPrompts.self) { _ in
+                await ListPrompts.Result(prompts: provider.prompts())
+            }
+
+            await server.withMethodHandler(GetPrompt.self) { params in
+                do {
+                    return try await provider.getPrompt(params.name, arguments: params.arguments)
+                } catch let PromptError.unknownPrompt(name) {
+                    throw MCPError.invalidParams("Unknown prompt: \(name)")
+                } catch let PromptError.missingArgument(name) {
+                    throw MCPError.invalidParams("Missing required argument: \(name)")
+                } catch let PromptError.invalidArgument(name, reason) {
+                    throw MCPError.invalidParams("Invalid argument \(name): \(reason)")
+                }
+            }
         }
 
-        await server.withMethodHandler(ListResourceTemplates.self) { _ in
-            await ListResourceTemplates.Result(templates: provider.resourceTemplates())
-        }
+        if capabilities.resources != nil {
+            await server.withMethodHandler(ListResources.self) { _ in
+                await ListResources.Result(resources: provider.resources())
+            }
 
-        await server.withMethodHandler(ReadResource.self) { params in
-            try await provider.readResource(params.uri)
+            await server.withMethodHandler(ListResourceTemplates.self) { _ in
+                await ListResourceTemplates.Result(templates: provider.resourceTemplates())
+            }
+
+            await server.withMethodHandler(ReadResource.self) { params in
+                try await provider.readResource(params.uri)
+            }
         }
     }
 }
