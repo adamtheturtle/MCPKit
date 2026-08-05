@@ -21,11 +21,10 @@ Add the `MCPKit` product to your target dependencies.
 
 ## Client configuration migration
 
-`MCPClient` is deprecated and will be removed in MCPKit 1.0. Applications that show
-client setup instructions or edit client configuration should use
+Applications that show client setup instructions or edit client configuration should use
 [`MCPClientInstall`](https://github.com/adamtheturtle/MCPClientInstall) and its
 `MCPDesktopClient` catalogue. Keeping client paths, formats, snippets, and safe file
-editing in that package prevents the two catalogues from drifting.
+editing in that package prevents duplicate catalogues from drifting.
 
 ## Requirements
 

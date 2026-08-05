@@ -12,8 +12,7 @@ The package also includes helpers for JSON-backed tool descriptors, loose argume
 coercion, result builders, prompt messages, and JSONL activity logging.
 
 Client configuration metadata and installation belong to the separate
-`MCPClientInstall` package. The deprecated ``MCPClient`` catalogue remains only for
-source compatibility and will be removed in MCPKit 1.0.
+`MCPClientInstall` package.
 
 ## Topics
 
