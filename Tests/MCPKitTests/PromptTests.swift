@@ -35,6 +35,12 @@ struct PromptHelperTests {
         )) {
             try requiredPromptArgument(["value": oversized], "value")
         }
+        #expect(throws: PromptError.invalidArgument(
+            name: "value",
+            reason: "must be at most \(maximumPromptArgumentUTF8Length) UTF-8 bytes"
+        )) {
+            try optionalPromptArgument(["value": oversized], "value")
+        }
 
         for value in ["left\u{202E}right", "isolated\u{2066}text", "zero\u{200B}width"] {
             #expect(promptArgument(["value": value], "value") == nil)
@@ -44,7 +50,21 @@ struct PromptHelperTests {
             )) {
                 try requiredPromptArgument(["value": value], "value")
             }
+            #expect(throws: PromptError.invalidArgument(
+                name: "value",
+                reason: "must not contain Unicode format controls"
+            )) {
+                try optionalPromptArgument(["value": value], "value")
+            }
         }
+    }
+
+    @Test
+    func `optionalPromptArgument allows absence and returns valid values`() throws {
+        #expect(try optionalPromptArgument(nil, "t") == nil)
+        #expect(try optionalPromptArgument([:], "t") == nil)
+        #expect(try optionalPromptArgument(["t": "   "], "t") == nil)
+        #expect(try optionalPromptArgument(["t": "  hi  "], "t") == "hi")
     }
 
     @Test
