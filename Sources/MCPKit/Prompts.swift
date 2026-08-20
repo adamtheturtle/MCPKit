@@ -45,10 +45,26 @@ private func validatePromptArgument(_ arguments: [String: String]?, _ key: Strin
 /// A trimmed, non-empty, bounded value for `key` in a prompt's arguments, or nil when
 /// absent or unsafe. Unicode format controls are rejected so bidi overrides and invisible
 /// separators cannot be interpolated into rendered prompts or diagnostics.
+///
+/// Prefer ``optionalPromptArgument(_:_:)`` for optional fields: this helper collapses
+/// invalid-present values into `nil`, which silently drops requested constraints.
 public func promptArgument(_ arguments: [String: String]?, _ key: String) -> String? {
     guard case let .valid(value) = validatePromptArgument(arguments, key) else { return nil }
 
     return value
+}
+
+/// An optional prompt argument that allows true absence while rejecting invalid-present
+/// values (oversized or Unicode format controls).
+public func optionalPromptArgument(_ arguments: [String: String]?, _ key: String) throws -> String? {
+    switch validatePromptArgument(arguments, key) {
+    case .missing:
+        return nil
+    case let .invalid(reason):
+        throw PromptError.invalidArgument(name: key, reason: reason)
+    case let .valid(value):
+        return value
+    }
 }
 
 /// A single required prompt argument, distinguishing an absent value from an unsafe one.
