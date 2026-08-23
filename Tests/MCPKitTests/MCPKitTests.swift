@@ -13,6 +13,9 @@ import Foundation
 import MCP
 @testable import MCPKit
 import Testing
+#if canImport(OSLog)
+import OSLog
+#endif
 
 @Suite("Argument coercion")
 struct ArgumentTests {
@@ -305,6 +308,21 @@ private struct ThrowingToolProvider: MCPToolProvider {
     }
 }
 
+/// Counts `tools()` invocations so call-path logging can prove it does not fetch
+/// the list unless debug logging will actually emit.
+private actor CountingToolsProvider: MCPToolProvider {
+    private(set) var toolsCallCount = 0
+
+    func tools() async -> [Tool] {
+        toolsCallCount += 1
+        return [Tool(name: "ping", description: "Ping.", inputSchema: .object([:]))]
+    }
+
+    func callTool(_ name: String, arguments _: [String: Value]?) async -> CallTool.Result {
+        name == "ping" ? textResult("pong") : errorResult("Unknown tool: \(name)")
+    }
+}
+
 @Suite("MCPToolProvider defaults")
 struct ProviderDefaultTests {
     private let provider = ToolsOnlyProvider()
@@ -378,6 +396,34 @@ struct ProviderDefaultTests {
         await #expect(throws: (any Error).self) {
             try await context.value
         }
+
+        await client.disconnect()
+    }
+
+    @Test
+    func `tools/call fetches tools only when debug logging will emit`() async throws {
+        let provider = CountingToolsProvider()
+        let (clientTransport, serverTransport) = await InMemoryTransport.createConnectedPair()
+        let client = Client(name: "TestClient", version: "1.0")
+        let server = MCPServer(name: "TestServer", version: "1.0", provider: provider)
+
+        try await server.start(transport: serverTransport)
+        _ = try await client.connect(transport: clientTransport)
+
+        let context: RequestContext<CallTool.Result> = try await client.callTool(name: "ping", arguments: nil)
+        let result = try await context.value
+        guard case let .text(text, _, _) = result.content.first else {
+            Issue.record("no text")
+            return
+        }
+        #expect(text == "pong")
+
+        #if canImport(OSLog)
+        let debugEnabled = Logger(subsystem: "MCPKit", category: "CallTool").isEnabled(type: .debug)
+        #expect(await provider.toolsCallCount == (debugEnabled ? 1 : 0))
+        #else
+        #expect(await provider.toolsCallCount == 0)
+        #endif
 
         await client.disconnect()
     }

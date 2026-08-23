@@ -85,18 +85,22 @@ public struct MCPServer {
         }
 
         await server.withMethodHandler(CallTool.self) { params in
-            let advertised = await provider.tools().map(\.name)
-            if !advertised.contains(params.name) {
-                #if canImport(OSLog)
-                callToolLog.debug(
-                    """
-                    callTool name \(params.name, privacy: .public) \
-                    is not in the advertised tools list \
-                    (\(advertised.joined(separator: ", "), privacy: .public))
-                    """
-                )
-                #endif
+            #if canImport(OSLog)
+            // Only fetch the tools list when debug logging will emit; `tools()` can be
+            // config-gated / non-trivial and must not run on every tools/call otherwise.
+            if callToolLog.isEnabled(type: .debug) {
+                let advertised = await provider.tools().map(\.name)
+                if !advertised.contains(params.name) {
+                    callToolLog.debug(
+                        """
+                        callTool name \(params.name, privacy: .public) \
+                        is not in the advertised tools list \
+                        (\(advertised.joined(separator: ", "), privacy: .public))
+                        """
+                    )
+                }
             }
+            #endif
             return try await provider.callTool(params.name, arguments: params.arguments)
         }
     }
