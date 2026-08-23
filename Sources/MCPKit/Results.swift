@@ -12,8 +12,27 @@ import MCP
 
 /// A plain-text tool result. `isError` nil marks success; pass `true` to flag a
 /// tool-level error the client should surface.
+///
+/// NUL bytes are rejected: they are valid in a Swift `String` but break JSON and stdio
+/// framing. Pass `Data` through ``textResult(utf8:isError:)`` when the payload may not be
+/// well-formed UTF-8.
 public func textResult(_ text: String, isError: Bool? = nil) -> CallTool.Result {
-    CallTool.Result(content: [.text(text: text, annotations: nil, _meta: nil)], isError: isError)
+    guard !text.unicodeScalars.contains(where: { $0.value == 0 }) else {
+        return CallTool.Result(
+            content: [.text(text: "Tool output contained a NUL byte.", annotations: nil, _meta: nil)],
+            isError: true
+        )
+    }
+    return CallTool.Result(content: [.text(text: text, annotations: nil, _meta: nil)], isError: isError)
+}
+
+/// Decodes `data` as UTF-8 and returns a text tool result, or an error result when the
+/// bytes are not valid UTF-8.
+public func textResult(utf8 data: Data, isError: Bool? = nil) -> CallTool.Result {
+    guard let text = String(data: data, encoding: .utf8) else {
+        return errorResult("Tool output is not valid UTF-8.")
+    }
+    return textResult(text, isError: isError)
 }
 
 /// An error tool result carrying `message`.
@@ -40,5 +59,5 @@ public func jsonResult(_ object: [String: Any]) -> CallTool.Result {
         return errorResult("Could not encode the result.")
     }
 
-    return textResult(String(decoding: data, as: UTF8.self))
+    return textResult(utf8: data)
 }
