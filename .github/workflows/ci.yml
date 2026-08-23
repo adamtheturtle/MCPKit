@@ -53,7 +53,7 @@ jobs:
       matrix:
         include:
           - name: iOS Simulator
-            destination: 'platform=iOS Simulator,name=iPhone 16,OS=latest'
+            destination: 'generic/platform=iOS Simulator'
           - name: tvOS
             destination: generic/platform=tvOS
           - name: watchOS
