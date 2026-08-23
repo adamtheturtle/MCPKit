@@ -10,6 +10,9 @@
 
 import Foundation
 import MCP
+#if canImport(OSLog)
+import OSLog
+#endif
 
 /// Serves an `MCPToolProvider` over the official MCP Swift SDK.
 ///
@@ -61,54 +64,79 @@ public struct MCPServer {
     /// forwards them to the provider. `PromptError` is mapped to a JSON-RPC error.
     private func registerHandlers() async {
         let provider = provider
-
         if capabilities.tools != nil {
-            await server.withMethodHandler(ListTools.self) { _ in
-                await ListTools.Result(tools: provider.tools())
-            }
-
-            await server.withMethodHandler(CallTool.self) { params in
-                try await provider.callTool(params.name, arguments: params.arguments)
-            }
+            await registerToolHandlers(provider: provider)
         }
-
         if capabilities.prompts != nil {
-            await server.withMethodHandler(ListPrompts.self) { _ in
-                await ListPrompts.Result(prompts: provider.prompts())
-            }
+            await registerPromptHandlers(provider: provider)
+        }
+        if capabilities.resources != nil {
+            await registerResourceHandlers(provider: provider)
+        }
+    }
 
-            await server.withMethodHandler(GetPrompt.self) { params in
-                do {
-                    return try await provider.getPrompt(params.name, arguments: params.arguments)
-                } catch let PromptError.unknownPrompt(name) {
-                    throw MCPError.invalidParams("Unknown prompt: \(name)")
-                } catch let PromptError.missingArgument(name) {
-                    throw MCPError.invalidParams("Missing required argument: \(name)")
-                } catch let PromptError.invalidArgument(name, reason) {
-                    throw MCPError.invalidParams("Invalid argument \(name): \(reason)")
-                }
-            }
+    private func registerToolHandlers(provider: any MCPToolProvider) async {
+        #if canImport(OSLog)
+        let callToolLog = Logger(subsystem: "MCPKit", category: "CallTool")
+        #endif
+
+        await server.withMethodHandler(ListTools.self) { _ in
+            await ListTools.Result(tools: provider.tools())
         }
 
-        if capabilities.resources != nil {
-            await server.withMethodHandler(ListResources.self) { _ in
-                await ListResources.Result(resources: provider.resources())
+        await server.withMethodHandler(CallTool.self) { params in
+            let advertised = await provider.tools().map(\.name)
+            if !advertised.contains(params.name) {
+                #if canImport(OSLog)
+                callToolLog.debug(
+                    """
+                    callTool name \(params.name, privacy: .public) \
+                    is not in the advertised tools list \
+                    (\(advertised.joined(separator: ", "), privacy: .public))
+                    """
+                )
+                #endif
             }
+            return try await provider.callTool(params.name, arguments: params.arguments)
+        }
+    }
 
-            await server.withMethodHandler(ListResourceTemplates.self) { _ in
-                await ListResourceTemplates.Result(templates: provider.resourceTemplates())
+    private func registerPromptHandlers(provider: any MCPToolProvider) async {
+        await server.withMethodHandler(ListPrompts.self) { _ in
+            await ListPrompts.Result(prompts: provider.prompts())
+        }
+
+        await server.withMethodHandler(GetPrompt.self) { params in
+            do {
+                return try await provider.getPrompt(params.name, arguments: params.arguments)
+            } catch let PromptError.unknownPrompt(name) {
+                throw MCPError.invalidParams("Unknown prompt: \(name)")
+            } catch let PromptError.missingArgument(name) {
+                throw MCPError.invalidParams("Missing required argument: \(name)")
+            } catch let PromptError.invalidArgument(name, reason) {
+                throw MCPError.invalidParams("Invalid argument \(name): \(reason)")
             }
+        }
+    }
 
-            await server.withMethodHandler(ReadResource.self) { params in
-                do {
-                    return try await provider.readResource(params.uri)
-                } catch let ResourceError.unknownResource(uri) {
-                    throw MCPError.invalidParams("Unknown resource URI: \(uri)")
-                } catch let ResourceError.invalidURI(uri) {
-                    throw MCPError.invalidParams("Invalid resource URI: \(uri)")
-                } catch let ResourceError.readFailed(uri, reason) {
-                    throw MCPError.invalidParams("Failed to read resource \(uri): \(reason)")
-                }
+    private func registerResourceHandlers(provider: any MCPToolProvider) async {
+        await server.withMethodHandler(ListResources.self) { _ in
+            await ListResources.Result(resources: provider.resources())
+        }
+
+        await server.withMethodHandler(ListResourceTemplates.self) { _ in
+            await ListResourceTemplates.Result(templates: provider.resourceTemplates())
+        }
+
+        await server.withMethodHandler(ReadResource.self) { params in
+            do {
+                return try await provider.readResource(params.uri)
+            } catch let ResourceError.unknownResource(uri) {
+                throw MCPError.invalidParams("Unknown resource URI: \(uri)")
+            } catch let ResourceError.invalidURI(uri) {
+                throw MCPError.invalidParams("Invalid resource URI: \(uri)")
+            } catch let ResourceError.readFailed(uri, reason) {
+                throw MCPError.invalidParams("Failed to read resource \(uri): \(reason)")
             }
         }
     }
