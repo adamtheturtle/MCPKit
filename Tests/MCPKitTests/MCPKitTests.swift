@@ -310,8 +310,8 @@ struct ProviderDefaultTests {
     }
 
     @Test
-    func `readResource defaults to throwing`() async {
-        await #expect(throws: (any Error).self) {
+    func `readResource defaults to throwing unknownResource`() async {
+        await #expect(throws: ResourceError.unknownResource("app://nope")) {
             try await provider.readResource("app://nope")
         }
     }

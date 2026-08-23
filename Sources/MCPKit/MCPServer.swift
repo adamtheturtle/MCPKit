@@ -100,7 +100,15 @@ public struct MCPServer {
             }
 
             await server.withMethodHandler(ReadResource.self) { params in
-                try await provider.readResource(params.uri)
+                do {
+                    return try await provider.readResource(params.uri)
+                } catch let ResourceError.unknownResource(uri) {
+                    throw MCPError.invalidParams("Unknown resource URI: \(uri)")
+                } catch let ResourceError.invalidURI(uri) {
+                    throw MCPError.invalidParams("Invalid resource URI: \(uri)")
+                } catch let ResourceError.readFailed(uri, reason) {
+                    throw MCPError.invalidParams("Failed to read resource \(uri): \(reason)")
+                }
             }
         }
     }
