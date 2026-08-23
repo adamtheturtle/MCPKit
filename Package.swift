@@ -41,9 +41,15 @@ let package = Package(
             path: "Examples/HostApp",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .executableTarget(
+            name: "JSONLLogAppendFixture",
+            dependencies: ["MCPKit"],
+            path: "Tests/JSONLLogAppendFixture",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "MCPKitTests",
-            dependencies: ["MCPKit", "MCPKitStdioFailureFixture"],
+            dependencies: ["MCPKit", "MCPKitStdioFailureFixture", "JSONLLogAppendFixture"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]
