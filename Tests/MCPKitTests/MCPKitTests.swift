@@ -146,6 +146,29 @@ struct ToolSchemaTests {
         #expect(descriptors.dropLast().allSatisfy { mcpTool(from: $0) == nil })
         #expect(mcpTools(from: descriptors).map(\.name) == ["valid_tool"])
     }
+
+    @Test
+    func `mcpTool rejects a non-object inputSchema`() {
+        #expect(mcpTool(from: ["name": "bad", "inputSchema": "not-an-object"]) == nil)
+        #expect(mcpTool(from: ["name": "bad", "inputSchema": ["array", "values"]]) == nil)
+        #expect(mcpTool(from: ["name": "bad", "inputSchema": 42]) == nil)
+    }
+
+    @Test
+    func `mcpAnnotations maps idempotentHint and preserves unknown keys in meta`() throws {
+        let descriptor: [String: Any] = [
+            "name": "annotated",
+            "annotations": [
+                "title": "Annotated",
+                "idempotentHint": true,
+                "customHint": "keep-me"
+            ]
+        ]
+        let tool = try #require(mcpTool(from: descriptor))
+        #expect(tool.annotations.idempotentHint == true)
+        #expect(tool._meta?["customHint"] == .string("keep-me"))
+        #expect(tool._meta?["title"] == nil)
+    }
 }
 
 @Suite("Result builders")
