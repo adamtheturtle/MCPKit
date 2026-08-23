@@ -32,7 +32,7 @@ Client configuration metadata and installation belong to the separate
 - ``stringArgument(_:_:)``
 - ``intArgument(_:_:)``
 - ``optionalString(_:_:)``
-- ``textResult(_:)``
+- ``textResult(_:isError:)``
 - ``errorResult(_:)``
 - ``jsonResult(_:)``
 - ``missingArgument(_:)``
