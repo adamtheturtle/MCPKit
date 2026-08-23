@@ -188,6 +188,21 @@ struct ResultTests {
     }
 
     @Test
+    func `textResult rejects NUL bytes in tool output`() {
+        let result = textResult("ok\0bad")
+        #expect(result.isError == true)
+        #expect(text(of: result)?.contains("NUL") == true)
+    }
+
+    @Test
+    func `textResult utf8 Data rejects invalid sequences`() {
+        let invalid = Data([0xFF, 0xFE, 0xFD])
+        let result = textResult(utf8: invalid)
+        #expect(result.isError == true)
+        #expect(text(of: result)?.contains("UTF-8") == true)
+    }
+
+    @Test
     func `missingArgument names the argument and is an error`() {
         let result = missingArgument("pad")
         #expect(text(of: result)?.contains("pad") == true)
