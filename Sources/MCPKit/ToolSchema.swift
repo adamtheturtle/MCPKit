@@ -89,7 +89,7 @@ public func mcpTool(from descriptor: [String: Any]) -> Tool? {
 /// Builds `Tool.Annotations` from a descriptor's `annotations` sub-object.
 ///
 /// Only the MCP hint keys `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
-/// and `openWorldHint` populate ``Tool/Annotations``. Any other keys are ignored here and
+/// and `openWorldHint` populate `Tool.Annotations`. Any other keys are ignored here and
 /// preserved on the tool's `_meta` when ``mcpTool(from:)`` builds the `Tool` (see
 /// ``annotationMeta(from:)``).
 public func mcpAnnotations(_ dict: [String: Any]) -> Tool.Annotations {
