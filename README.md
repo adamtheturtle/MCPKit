@@ -1,5 +1,8 @@
 # MCPKit
 
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fadamtheturtle%2FMCPKit%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/adamtheturtle/MCPKit)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fadamtheturtle%2FMCPKit%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/adamtheturtle/MCPKit)
+
 Scaffolding for exposing Swift app features as a Model Context Protocol server, built on
 the official MCP Swift SDK.
 
