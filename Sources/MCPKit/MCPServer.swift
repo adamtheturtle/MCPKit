@@ -10,6 +10,9 @@
 
 import Foundation
 import MCP
+#if canImport(OSLog)
+import OSLog
+#endif
 
 /// Serves an `MCPToolProvider` over the official MCP Swift SDK.
 ///
@@ -61,6 +64,9 @@ public struct MCPServer {
     /// forwards them to the provider. `PromptError` is mapped to a JSON-RPC error.
     private func registerHandlers() async {
         let provider = provider
+        #if canImport(OSLog)
+        let callToolLog = Logger(subsystem: "MCPKit", category: "CallTool")
+        #endif
 
         if capabilities.tools != nil {
             await server.withMethodHandler(ListTools.self) { _ in
@@ -68,7 +74,19 @@ public struct MCPServer {
             }
 
             await server.withMethodHandler(CallTool.self) { params in
-                try await provider.callTool(params.name, arguments: params.arguments)
+                let advertised = await provider.tools().map(\.name)
+                if !advertised.contains(params.name) {
+                    #if canImport(OSLog)
+                    callToolLog.debug(
+                        """
+                        callTool name \(params.name, privacy: .public) \
+                        is not in the advertised tools list \
+                        (\(advertised.joined(separator: ", "), privacy: .public))
+                        """
+                    )
+                    #endif
+                }
+                return try await provider.callTool(params.name, arguments: params.arguments)
             }
         }
 
