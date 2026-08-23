@@ -35,6 +35,12 @@ let package = Package(
             path: "Tests/StdioFailureFixture",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .executableTarget(
+            name: "MCPKitExample",
+            dependencies: ["MCPKit"],
+            path: "Examples/HostApp",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "MCPKitTests",
             dependencies: ["MCPKit", "MCPKitStdioFailureFixture"],

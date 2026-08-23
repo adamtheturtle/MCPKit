@@ -18,6 +18,8 @@ Add the `MCPKit` product to your target dependencies.
 
 - `MCPKit`: Provider protocols, server bootstrap, argument helpers, result builders, and
   activity logging for MCP integrations.
+- `MCPKitExample`: Minimal stdio host (`swift run MCPKitExample --mcp`) demonstrating
+  tools, prompts, and bootstrap.
 
 ## Client configuration migration
 
