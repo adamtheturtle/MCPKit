@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Track notable changes here before the next tagged release.
+- Track changes here before the next tagged release.
 
 ## 0.5.1
 

@@ -14,7 +14,7 @@ Revoke any credential that may have been exposed.
 
 ## Scope notes
 
-- Prefer private directories for activity logs; `JSONLLog` creates files with mode `0600`.
+- Prefer private directories for activity logs. `JSONLLog` creates files with mode `0600`.
 - Treat tool arguments and prompt inputs as untrusted client data.
 - Host apps remain responsible for authorization, filesystem paths, and network access
   behind their `MCPToolProvider` implementations.
