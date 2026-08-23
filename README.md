@@ -4,7 +4,8 @@ Scaffolding for exposing Swift app features as a Model Context Protocol server, 
 the official MCP Swift SDK.
 
 [Documentation](https://swiftpackageindex.com/adamtheturtle/MCPKit/documentation/mcpkit) |
-[Swift Package Index](https://swiftpackageindex.com/adamtheturtle/MCPKit)
+[Swift Package Index](https://swiftpackageindex.com/adamtheturtle/MCPKit) |
+[Release notes](CHANGELOG.md)
 
 ## Installation
 
