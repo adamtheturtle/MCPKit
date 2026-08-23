@@ -59,5 +59,9 @@ struct ExampleProvider: MCPToolProvider {
 MCPServer.runOverStdioUntilExit(
     name: "MCPKitExample",
     version: "0.1.0",
+    capabilities: .init(
+        prompts: .init(listChanged: false),
+        tools: .init(listChanged: false)
+    ),
     provider: ExampleProvider()
 )
