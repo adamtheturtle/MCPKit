@@ -35,7 +35,7 @@ checklist when moving snippet generation out of a host app.
 - ``stringArgument(_:_:)``
 - ``intArgument(_:_:)``
 - ``optionalString(_:_:)``
-- ``textResult(_:)``
+- ``textResult(_:isError:)``
 - ``errorResult(_:)``
 - ``jsonResult(_:)``
 - ``missingArgument(_:)``
