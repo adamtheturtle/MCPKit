@@ -39,8 +39,11 @@ jobs:
       - name: Build
         run: swift build --build-tests
 
-      - name: Test
-        run: swift test
+      - name: Test with coverage
+        run: swift test --enable-code-coverage
+
+      - name: Show coverage path
+        run: swift test --show-codecov-path
 
   prose:
     name: Vale
