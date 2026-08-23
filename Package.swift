@@ -17,7 +17,7 @@ let package = Package(
     dependencies: [
         // The official Model Context Protocol Swift SDK, which MCPKit builds on.
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.1"),
-        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5")
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.5")
     ],
     targets: [
         .target(
