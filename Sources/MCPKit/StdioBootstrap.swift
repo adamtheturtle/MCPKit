@@ -31,7 +31,12 @@ public extension MCPServer {
     }
 
     /// The version to report in the MCP `initialize` handshake's `serverInfo`, read from
-    /// the app bundle's `CFBundleShortVersionString`, defaulting to `"1.0"`.
+    /// the app bundle's `CFBundleShortVersionString`.
+    ///
+    /// CLI / SPM executable targets often ship without an `Info.plist`, so this falls back
+    /// to `"1.0"`. Pass an explicit `version:` to
+    /// ``runOverStdioUntilExit(name:version:capabilities:isEnabled:disabledMessage:onLaunch:provider:)``
+    /// when that default is wrong for your binary.
     static var bundleShortVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
     }

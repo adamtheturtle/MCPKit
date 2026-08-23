@@ -34,6 +34,11 @@ editing in that package prevents duplicate catalogues from drifting.
 - Swift 6.1+
 - macOS 13+, Mac Catalyst 16+, iOS 16+, watchOS 9+, tvOS 16+, or visionOS 1+
 
+## Testing
+
+Unit tests use Swift Testing. See [Docs/SwiftTestingMigration.md](Docs/SwiftTestingMigration.md)
+for the migration status and contribution notes.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
