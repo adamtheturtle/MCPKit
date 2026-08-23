@@ -40,4 +40,5 @@ Client configuration metadata and installation belong to the separate
 ### Prompts and logging
 
 - ``PromptError``
+- ``ResourceError``
 - ``JSONLLog``

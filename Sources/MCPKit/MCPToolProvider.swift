@@ -40,8 +40,8 @@ public protocol MCPToolProvider: Sendable {
     /// The URI templates to advertise from `resources/templates/list`. Defaults to none.
     func resourceTemplates() async -> [Resource.Template]
 
-    /// Read the resource at `uri` for `resources/read`. Throw to signal an unknown URI
-    /// or a fetch failure. Defaults to "unknown resource".
+    /// Read the resource at `uri` for `resources/read`. Throw `ResourceError` (or any
+    /// `Error`) to signal an unknown URI or a fetch failure. Defaults to "unknown resource".
     func readResource(_ uri: String) async throws -> ReadResource.Result
 }
 
@@ -57,6 +57,6 @@ public extension MCPToolProvider {
     func resourceTemplates() async -> [Resource.Template] { [] }
 
     func readResource(_ uri: String) async throws -> ReadResource.Result {
-        throw MCPError.invalidParams("Unknown resource URI: \(uri)")
+        throw ResourceError.unknownResource(uri)
     }
 }

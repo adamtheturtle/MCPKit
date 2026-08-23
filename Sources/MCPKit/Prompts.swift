@@ -20,6 +20,14 @@ public enum PromptError: Swift.Error, Equatable {
     case invalidArgument(name: String, reason: String)
 }
 
+/// Raised when a resource can't be read. A host's `MCPToolProvider.readResource` throws
+/// these and `MCPServer` maps them to JSON-RPC `invalidParams` errors.
+public enum ResourceError: Swift.Error, Equatable {
+    case unknownResource(String)
+    case invalidURI(String)
+    case readFailed(uri: String, reason: String)
+}
+
 /// The largest prompt argument these helpers return, measured as UTF-8 bytes.
 public let maximumPromptArgumentUTF8Length = 16 * 1_024
 
