@@ -24,6 +24,12 @@ public extension MCPServer {
     /// its UI.
     static let stdioModeFlag = "--mcp"
 
+    /// Default capabilities for ``runOverStdioUntilExit(name:version:capabilities:isEnabled:disabledMessage:onLaunch:provider:)``:
+    /// tools only, without prompt or resource advertisements.
+    public static let stdioDefaultCapabilities = Server.Capabilities(
+        tools: .init(listChanged: false)
+    )
+
     /// Whether `arguments` (typically `CommandLine.arguments`) requests headless MCP mode,
     /// i.e. contains the `--mcp` flag past the executable path.
     static func wantsStdioMCP(_ arguments: [String] = CommandLine.arguments) -> Bool {
@@ -71,7 +77,7 @@ public extension MCPServer {
     static func runOverStdioUntilExit(
         name: String,
         version: String = bundleShortVersion,
-        capabilities: Server.Capabilities = .init(tools: .init(listChanged: false)),
+        capabilities: Server.Capabilities = stdioDefaultCapabilities,
         isEnabled: @Sendable () -> Bool = { true },
         disabledMessage: String? = nil,
         onLaunch: @Sendable () -> Void = {},

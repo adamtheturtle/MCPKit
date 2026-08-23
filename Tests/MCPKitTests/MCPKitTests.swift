@@ -249,6 +249,14 @@ struct StdioBootstrapTests {
     }
 
     @Test
+    func `stdioDefaultCapabilities advertise tools only`() {
+        let capabilities = MCPServer.stdioDefaultCapabilities
+        #expect(capabilities.tools != nil)
+        #expect(capabilities.prompts == nil)
+        #expect(capabilities.resources == nil)
+    }
+
+    @Test
     func `a thrown server operation exits its process with failure`() throws {
         let fixture = Bundle(for: TestBundleMarker.self).bundleURL
             .deletingLastPathComponent()
