@@ -12,7 +12,8 @@ The package also includes helpers for JSON-backed tool descriptors, loose argume
 coercion, result builders, prompt messages, and JSONL activity logging.
 
 Client configuration metadata and installation belong to the separate
-`MCPClientInstall` package.
+`MCPClientInstall` package. See <doc:ClientInstallMigration> for a migration
+checklist when moving snippet generation out of a host app.
 
 ## Topics
 
@@ -20,6 +21,8 @@ Client configuration metadata and installation belong to the separate
 
 - ``MCPToolProvider``
 - ``MCPServer``
+- <doc:ActivityLogging>
+- <doc:ClientInstallMigration>
 
 ### Tool descriptors
 
