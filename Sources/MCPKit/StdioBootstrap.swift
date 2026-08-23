@@ -24,7 +24,8 @@ public extension MCPServer {
     /// its UI.
     static let stdioModeFlag = "--mcp"
 
-    /// Default capabilities for ``runOverStdioUntilExit(name:version:capabilities:isEnabled:disabledMessage:onLaunch:provider:)``:
+    /// Default capabilities for
+    /// ``runOverStdioUntilExit(name:version:capabilities:isEnabled:disabledMessage:onLaunch:provider:)``:
     /// tools only, without prompt or resource advertisements.
     public static let stdioDefaultCapabilities = Server.Capabilities(
         tools: .init(listChanged: false)
