@@ -1,7 +1,6 @@
 # Swift Testing migration plan
 
-MCPKit's unit tests already use [Swift Testing](https://developer.apple.com/xcode/swift-testing/)
-(`import Testing`, `@Suite`, `@Test`) rather than XCTest.
+MCPKit's unit tests already use [Swift Testing](https://developer.apple.com/xcode/swift-testing/) (`import Testing`, `@Suite`, `@Test`) rather than XCTest.
 
 ## Current state
 
@@ -11,12 +10,10 @@ MCPKit's unit tests already use [Swift Testing](https://developer.apple.com/xcod
 
 ## Remaining work (optional)
 
-1. Prefer parameterized `@Test(arguments:)` wherever a table of inputs replaces
-   copy-pasted cases (already used for non-finite doubles).
-2. Keep process-level stdio fixtures as separate executables; do not force them into
-   XCTest-style `XCTestCase` subclasses.
-3. When adding new MCPServer integration tests, favor in-memory transports and
-   Swift Testing suites over XCTest expectations.
+1. Prefer parameterized `@Test(arguments:)` wherever a table of inputs replaces copy-pasted cases (already used for non-finite doubles).
+2. Keep process-level stdio fixtures as separate executables.
+   Leave them outside XCTest-style `XCTestCase` subclasses.
+3. When adding new MCPServer integration tests, favor in-memory transports and Swift Testing suites over XCTest expectations.
 4. Do not reintroduce `XCTest` imports unless a dependency forces it.
 
 No further framework migration is required for day-to-day contributions.

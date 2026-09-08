@@ -4,10 +4,9 @@ Keep desktop-client configuration out of MCPKit.
 
 ## Why a separate package
 
-MCPKit serves tools; it does not own where Claude Desktop, Cursor, or other clients store
-config files. Duplicate catalogues drift. Use
-[MCPClientInstall](https://github.com/adamtheturtle/MCPClientInstall) and its
-`MCPDesktopClient` catalogue for paths, formats, snippets, and safe file edits.
+MCPKit serves tools; it does not own where Claude Desktop, Cursor, or other clients store config files.
+Duplicate catalogues drift.
+Use [MCPClientInstall](https://github.com/adamtheturtle/MCPClientInstall) and its `MCPDesktopClient` catalogue for paths, formats, snippets, and safe file edits.
 
 ## Migration checklist
 
