@@ -2,7 +2,7 @@
 
 Keep desktop-client configuration out of MCPKit.
 
-## Why a separate package
+## Package dependencies
 
 MCPKit serves tools; it does not own where Claude Desktop, Cursor, or other clients store config files.
 Duplicate catalogues drift.

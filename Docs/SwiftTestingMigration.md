@@ -16,4 +16,4 @@ MCPKit's unit tests already use [Swift Testing](https://developer.apple.com/xcod
 3. When adding new MCPServer integration tests, favor in-memory transports and Swift Testing suites over XCTest expectations.
 4. Do not reintroduce `XCTest` imports unless a dependency forces it.
 
-No further framework migration is required for day-to-day contributions.
+Contributors can use Swift Testing for day-to-day work.

@@ -5,7 +5,7 @@ Record headless `--mcp` launches in a shared JSONL activity log.
 ## Overview
 
 A GUI process and a headless MCP process do not share memory.
-Use ``JSONLLog`` in a directory both can reach, and append from the `onLaunch` closure of ``MCPServer/runOverStdioUntilExit(name:version:capabilities:isEnabled:disabledMessage:onLaunch:provider:)`` (and from tool handlers if desired) so a settings pane can tail recent activity.
+Use ``JSONLLog`` in a directory accessible to both processes, and append from the `onLaunch` closure of ``MCPServer/runOverStdioUntilExit(name:version:capabilities:isEnabled:disabledMessage:onLaunch:provider:)`` (and from tool handlers if desired) so a settings pane can tail recent activity.
 
 ## Example
 
